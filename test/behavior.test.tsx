@@ -446,3 +446,31 @@ describe('field arrays', () => {
     );
   });
 });
+
+describe('react-recoil-form compatibility', () => {
+  it('treats skipRecoilRoot as skipJotaiProvider', async () => {
+    let outsideValues: any;
+
+    function OutsideWatcher() {
+      outsideValues = useFormValues({ formId: 'shared-form' });
+      return null;
+    }
+
+    function Form() {
+      useForm({ initialValues: { a: 'shared' }, onSubmit: () => undefined });
+      return <TextField name="a" />;
+    }
+
+    await render(
+      <>
+        <FormProvider options={{ skipRecoilRoot: true, formId: 'shared-form' }}>
+          <Form />
+        </FormProvider>
+        <OutsideWatcher />
+      </>
+    );
+
+    // Both use the default jotai store so the form values are visible outside the provider
+    expect(outsideValues).toEqual({ a: 'shared' });
+  });
+});

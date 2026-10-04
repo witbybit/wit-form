@@ -1,6 +1,6 @@
 # Wit Form
 
-Wit Form is a React form library built on [Jotai](https://jotai.org) where the state of every field is an atom. It started as a port of [react-recoil-form](https://github.com/witbybit/react-recoil-form) from Recoil to Jotai and keeps the same API. The goal is to handle large forms easily: typing in one field doesn't re-render the whole form. Features so far:
+Wit Form is a React form library built on [Jotai](https://jotai.org) where the state of every field is an atom. The goal is to handle large forms easily: typing in one field doesn't re-render the whole form. Features so far:
 
 - useForm: sets up the form with onSubmit and onError handlers
 - useField: used in field components to capture changes, read the value and validate
@@ -62,10 +62,6 @@ export default function App() {
 
 By default every `<FormProvider>` creates its own Jotai store. To keep the form atoms in an existing Jotai `<Provider>` store (or the default store), pass `options={{ skipJotaiProvider: true }}`. Combine it with `options={{ formId }}` to watch a form's fields from outside its `<FormProvider>`, e.g. `useFormValues({ formId })`.
 
-# Migrating from react-recoil-form
-
-- Replace the `recoil` dependency with `jotai` and change imports from `react-recoil-form` to `wit-form`.
-- The `skipRecoilRoot` option of `FormProvider` / `withFormProvider` is now called `skipJotaiProvider`.
-- Everything else (hooks, `Field`, types) keeps the same API.
-
 To get started, look at the examples in `src/stories` (`yarn storybook`).
+
+> **Coming from react-recoil-form?** Wit Form is a drop-in replacement: swap the `recoil` dependency for `jotai` and change imports from `react-recoil-form` to `wit-form`. (`skipRecoilRoot` still works as an alias of `skipJotaiProvider`.)

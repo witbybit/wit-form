@@ -1450,6 +1450,10 @@ interface FormProviderOptions {
    */
   skipJotaiProvider?: boolean;
   /**
+   * @deprecated Use skipJotaiProvider instead. Kept so that react-recoil-form code works without changes.
+   */
+  skipRecoilRoot?: boolean;
+  /**
    * Skip dirty check and real-time observer for form values. This can result in better performance in some cases.
    */
   skipValuesObserver?: boolean;
@@ -1470,7 +1474,9 @@ export function FormProvider(props: {
   const isGeneratedFormId = useRef(!props?.options?.formId);
   const storeRef = useRef<ReturnType<typeof createStore> | null>(null);
   const removeAtomsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  if (!props.options?.skipJotaiProvider && !storeRef.current) {
+  const skipJotaiProvider =
+    props.options?.skipJotaiProvider ?? props.options?.skipRecoilRoot;
+  if (!skipJotaiProvider && !storeRef.current) {
     storeRef.current = createStore();
   }
 
@@ -1500,7 +1506,7 @@ export function FormProvider(props: {
     </FormIdContext.Provider>
   );
 
-  if (props.options?.skipJotaiProvider || !storeRef.current) {
+  if (skipJotaiProvider || !storeRef.current) {
     return children;
   }
   return <Provider store={storeRef.current}>{children}</Provider>;
