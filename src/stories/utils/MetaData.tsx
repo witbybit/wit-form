@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function MetaData(props: any) {
   const { formData } = props;
   return (

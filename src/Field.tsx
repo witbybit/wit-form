@@ -1,6 +1,6 @@
-import React, { ReactElement } from 'react';
+import React, { type ReactElement } from 'react';
 import { useField } from './FormProvider';
-import { IAncestorInput } from './types';
+import { type IAncestorInput } from './types';
 
 interface IRenderProps {
   value: any;
@@ -22,8 +22,7 @@ interface IField {
   ancestors?: IAncestorInput[];
   validate?: (value?: any, otherParams?: any) => string | null | undefined;
   depFields?: (
-    | string
-    | { name: string; ancestors?: { name: string; rowId: number }[] }
+    string | { name: string; ancestors?: { name: string; rowId: number }[] }
   )[];
 }
 

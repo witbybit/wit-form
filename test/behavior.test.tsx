@@ -1,6 +1,4 @@
-import * as React from 'react';
-import * as ReactDOM from 'react-dom';
-import { act } from 'react-dom/test-utils';
+import { useMemo, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   FormProvider,
@@ -13,33 +11,10 @@ import {
   useFormValues,
   useIsDirty,
 } from '../src';
-
-const flushEffects = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-let container: HTMLDivElement;
-
-async function render(element: React.ReactElement) {
-  container = document.createElement('div');
-  await act(async () => {
-    ReactDOM.render(element, container);
-    await flushEffects();
-  });
-}
-
-async function run(fn: () => any) {
-  let result: any;
-  await act(async () => {
-    result = fn();
-    await flushEffects();
-    await flushEffects();
-  });
-  return result;
-}
+import { container, render, run, unmount } from './render';
 
 afterEach(() => {
-  if (container) {
-    ReactDOM.unmountComponentAtNode(container);
-  }
+  unmount();
 });
 
 const renderCounts: { [name: string]: number } = {};
@@ -212,7 +187,7 @@ describe('fields', () => {
     let setShow: (show: boolean) => void = () => {};
 
     function Form(props: { skipUnregister?: boolean }) {
-      const [show, _setShow] = React.useState(true);
+      const [show, _setShow] = useState(true);
       setShow = _setShow;
       useForm({
         onSubmit: () => undefined,
@@ -234,7 +209,7 @@ describe('fields', () => {
       expect(ctx.getValues().values).toEqual(
         skipUnregister ? { temp: 'hello' } : {}
       );
-      ReactDOM.unmountComponentAtNode(container);
+      unmount();
     }
   });
 });
@@ -357,7 +332,7 @@ describe('field arrays', () => {
     ];
 
     function Tasks(props: { rowId: number }) {
-      const ancestors = React.useMemo(
+      const ancestors = useMemo(
         () => [{ name: 'sections', rowId: props.rowId }],
         [props.rowId]
       );

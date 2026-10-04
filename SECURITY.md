@@ -2,13 +2,11 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+Only the latest released version of `wit-form` receives security fixes.
 
 ## Reporting a Vulnerability
 
-Please report any security vulnerability as a Github Issue and
-I will handle it on high priority. If it's accepted, I will target
-resolving it within 24 hrs. If declined, I will share a detailed reason
-explaining why it was declined.
+Please do not report security vulnerabilities in public GitHub issues.
+Instead, report them privately through
+[GitHub security advisories](https://github.com/witbybit/wit-form/security/advisories/new).
+We will acknowledge the report as soon as possible and keep you updated on the fix.

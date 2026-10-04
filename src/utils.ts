@@ -1,3 +1,6 @@
+// Path segments that would let a field name/path write to (or read from) object prototypes
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 export function getPathInObj(
   obj: any,
   path: string,
@@ -15,8 +18,11 @@ export function getPathInObj(
     String.prototype.split
       .call(path ?? '', regexp)
       .filter(Boolean)
-      .reduce(
-        (res, key) => (res !== null && res !== undefined ? res[key] : res),
+      .reduce<any>(
+        (res, key) =>
+          res !== null && res !== undefined && !UNSAFE_KEYS.has(key)
+            ? res[key]
+            : undefined,
         obj
       );
   const result = travel(/[,[\]]+?/) || travel(/[,[\].]+?/);
@@ -49,8 +55,13 @@ export function setPathInObj(
       const isLastKey = nextPathMatch.done;
       const nextMatch = nextPathMatch.value;
       key = match[0];
+      if (UNSAFE_KEYS.has(key)) {
+        return obj;
+      }
       const isKeyArrIdx =
-        !isLastKey && path.charAt(nextMatch.index - 1) === '[';
+        !isLastKey &&
+        nextMatch?.index !== undefined &&
+        path.charAt(nextMatch.index - 1) === '[';
       if (isLastKey) {
         objInFocus[key] = value;
       } else {
@@ -78,6 +89,18 @@ export function isDeepEqual(
     typeof obj2 !== 'object' ||
     obj1 == null ||
     obj2 == null
+  ) {
+    return false;
+  }
+
+  if (obj1 instanceof Date && obj2 instanceof Date) {
+    return obj1.getTime() === obj2.getTime();
+  }
+
+  // Objects other than arrays and plain objects (File, Blob, Map, class instances, etc.) are compared by reference
+  if (
+    (!Array.isArray(obj1) && !isPlainObject(obj1)) ||
+    (!Array.isArray(obj2) && !isPlainObject(obj2))
   ) {
     return false;
   }
@@ -110,27 +133,33 @@ export function isDeepEqual(
   return result;
 }
 
-function fromEntries(iterable: any[]) {
-  if ('fromEntries' in Object) {
-    return Object.fromEntries(iterable);
+function isPlainObject(val: any) {
+  if (val === null || typeof val !== 'object') {
+    return false;
   }
-  return [...iterable].reduce((obj, [key, val]) => {
-    obj[key] = val;
-    return obj;
-  }, {});
+  const proto = Object.getPrototypeOf(val);
+  return proto === Object.prototype || proto === null;
 }
 
+/**
+ * Deep clones arrays and plain objects.
+ * Other objects (Date, File, Blob, Map, class instances, etc.) are kept as is
+ * since copying their own enumerable keys would turn them into empty objects.
+ */
 export function cloneDeep(src: any): any {
   if (Array.isArray(src)) {
     return src.map(cloneDeep);
   }
-  // DEVNOTE: null needs to be checked separately since typeof null is 'object' in javascript
-  if (src === null || typeof src !== 'object' || src instanceof File) {
+  if (!isPlainObject(src)) {
     return src;
   }
-  return fromEntries(
-    Object.entries(src).map(([key, val]) => [key, cloneDeep(val)])
-  );
+  const result: any = {};
+  for (const key of Object.keys(src)) {
+    if (!UNSAFE_KEYS.has(key)) {
+      result[key] = cloneDeep(src[key]);
+    }
+  }
+  return result;
 }
 
 export function isUndefined(val: any) {

@@ -1,4 +1,4 @@
-import { Atom, atom, WritableAtom } from 'jotai';
+import { type Atom, atom, type WritableAtom } from 'jotai';
 import { cloneDeep } from './utils';
 
 export function gan(atomName: string) {

@@ -1,5 +1,4 @@
 import FieldArrayRepro from './repros/FieldArrayRepro';
-import React from 'react';
 import ResetFieldRepro from './repros/ResetFieldRepro';
 import FieldArrayWatchRepro from './repros/FieldArrayWatchRepro';
 

@@ -12,7 +12,7 @@ function SimpleFieldArray() {
     return Promise.resolve();
   }
 
-  const { handleSubmit, resetInitialValues, validateFields } = useForm({
+  const { handleSubmit, validateFields } = useForm({
     onSubmit,
     initialValues: {
       // items: [

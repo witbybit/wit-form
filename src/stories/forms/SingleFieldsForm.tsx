@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm, withFormProvider } from '../../FormProvider';
 import Button from '../utils/Button';
 import { InputField, WatchField } from '../utils/Fields';

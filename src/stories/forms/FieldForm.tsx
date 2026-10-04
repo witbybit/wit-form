@@ -51,7 +51,7 @@ function FieldForm() {
               <label className="flex items-center gap-2">
                 <input
                   checked={!!value}
-                  onChange={(e) => onChange(!value)}
+                  onChange={() => onChange(!value)}
                   type="checkbox"
                   className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />

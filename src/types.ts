@@ -42,8 +42,7 @@ export interface IRemoveFieldParams {
 
 export interface IFieldWatchParams {
   fieldNames: (
-    | string
-    | { ancestors?: { name: string; rowId: number }[]; name: string }
+    string | { ancestors?: { name: string; rowId: number }[]; name: string }
   )[];
   /**
    * This is needed only for the advanced case of watching field outside the FormProvider hierarchy (assuming a formId was specified).
@@ -95,8 +94,7 @@ export interface IFieldProps<D> {
    * Useful for referencing other fields in validation
    * */
   depFields?: (
-    | string
-    | { name: string; ancestors?: { name: string; rowId: number }[] }
+    string | { name: string; ancestors?: { name: string; rowId: number }[] }
   )[];
   skipUnregister?: boolean;
 }

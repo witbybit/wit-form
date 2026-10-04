@@ -1,0 +1,14 @@
+# Supply-chain protections
+# Only install package versions that have been published for at least 3 days,
+# which gives the ecosystem time to catch compromised releases.
+minimumReleaseAge: 4320
+# Fail if a package version was published with weaker trust evidence (e.g. without provenance)
+# than an earlier version of the same package, a common sign of a hijacked account.
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  # Maintenance release of an old major published by the npm team before they adopted provenance
+  # (still required by babel). Not a takeover.
+  - semver@6.3.1
+# Dependency install scripts are blocked unless explicitly allowed here.
+allowBuilds:
+  esbuild: true

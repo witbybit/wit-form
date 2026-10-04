@@ -1,5 +1,5 @@
 import { withFormProvider, useForm, useIsDirty } from '../..';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { InputField } from '../utils/Fields';
 import MetaData from '../utils/MetaData';
 import Button from '../utils/Button';
@@ -30,7 +30,7 @@ const levels = [
 
 function DirtyCheckForm() {
   const [formData, setFormData] = useState({});
-  const [data, setData] = useState({});
+  const [, setData] = useState({});
   const [currentLevel, setCurrentLevel] = useState('level1');
   const currentInitialValues = allLevelInitialValues?.[currentLevel];
   const isDirty = useIsDirty();

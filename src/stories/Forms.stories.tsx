@@ -1,4 +1,3 @@
-import React from 'react';
 import DirtyCheckForm from './forms/DirtyCheckForm';
 import FieldForm from './forms/FieldForm';
 import FieldValidateForm from './forms/FieldValidateForm';

@@ -1,31 +1,24 @@
-/**
- * @jest-environment jsdom
- */
-
-import * as React from 'react';
-import * as ReactDOM from 'react-dom';
-import { act } from 'react-dom/test-utils';
+import { useEffect } from 'react';
 import { useSetAtom } from 'jotai';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { formInitialValuesAtom } from '../src/atoms';
 import { FormProvider, useField, useFieldArray, useForm } from '../src';
+import { container, render, run, unmount } from './render';
 
-const flushEffects = () => new Promise((resolve) => setTimeout(resolve, 0));
+afterEach(() => {
+  unmount();
+});
 
 describe('it', () => {
-  it('renders without crashing', () => {
-    const div = document.createElement('div');
-    ReactDOM.render(
+  it('renders without crashing', async () => {
+    await render(
       <FormProvider>
         <div></div>
-      </FormProvider>,
-      div
+      </FormProvider>
     );
-    ReactDOM.unmountComponentAtNode(div);
   });
 
   it('reconciles a mounted field array when initial values reset to an explicit empty array', async () => {
-    const div = document.createElement('div');
     const formId = 'field-array-empty-reset';
     const initialValues = {
       items: [{ name: 'first' }, { name: 'second' }],
@@ -45,7 +38,7 @@ describe('it', () => {
     function InitialValuesUpdater() {
       const setInitialValues = useSetAtom(formInitialValuesAtom(formId));
 
-      React.useEffect(() => {
+      useEffect(() => {
         bumpInitialValues = (values: any) => {
           setInitialValues((current) => ({
             ...current,
@@ -80,18 +73,14 @@ describe('it', () => {
       );
     }
 
-    await act(async () => {
-      ReactDOM.render(
-        <FormProvider options={{ formId }}>
-          <Form />
-        </FormProvider>,
-        div
-      );
-      await flushEffects();
-    });
+    await render(
+      <FormProvider options={{ formId }}>
+        <Form />
+      </FormProvider>
+    );
 
     expect(
-      div.querySelectorAll('[data-testid="field-array-row"]')
+      container.querySelectorAll('[data-testid="field-array-row"]')
     ).toHaveLength(2);
     expect(getFieldArrayValue()).toEqual([
       { name: 'first' },
@@ -100,17 +89,11 @@ describe('it', () => {
 
     // This targets the mounted reinitialization path: an explicit [] must still
     // reconcile rowIds instead of preserving stale row data.
-    await act(async () => {
-      bumpInitialValues({ items: [] });
-      await flushEffects();
-      await flushEffects();
-    });
+    await run(() => bumpInitialValues({ items: [] }));
 
     expect(
-      div.querySelectorAll('[data-testid="field-array-row"]')
+      container.querySelectorAll('[data-testid="field-array-row"]')
     ).toHaveLength(0);
     expect(getFieldArrayValue()).toEqual([]);
-
-    ReactDOM.unmountComponentAtNode(div);
   });
 });

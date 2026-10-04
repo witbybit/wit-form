@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useForm, useFormContext, withFormProvider } from '../../FormProvider';
 import Button from '../utils/Button';
-import { InputField, InputFieldProps } from '../utils/Fields';
+import { InputField, type InputFieldProps } from '../utils/Fields';
 import MetaData from '../utils/MetaData';
 
 function FormContext() {
@@ -45,7 +45,7 @@ function ContextField(props: InputFieldProps) {
   return (
     <InputField
       {...props}
-      onChange={(value) => {
+      onChange={() => {
         setValue(
           { ancestors: [], name: 'email', type: 'field' },
           { value: '' }

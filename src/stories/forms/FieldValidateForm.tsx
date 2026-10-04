@@ -3,7 +3,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { withFormProvider, useForm, useField } from '../../FormProvider';
 import Button from '../utils/Button';
-import { InputFieldProps } from '../utils/Fields';
+import { type InputFieldProps } from '../utils/Fields';
 import MetaData from '../utils/MetaData';
 
 function FieldValidateForm() {

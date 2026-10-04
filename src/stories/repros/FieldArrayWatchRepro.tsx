@@ -1,4 +1,4 @@
-import { shuffle } from 'lodash';
+import { shuffle } from '../utils/utils';
 import * as React from 'react';
 import {
   useFieldArray,

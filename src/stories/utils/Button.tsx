@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function Button(props: any) {
   const { children, primary, small, color = 'blue', ...rest } = props;
   return (
