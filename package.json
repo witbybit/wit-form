@@ -1,0 +1,70 @@
+{
+  "name": "wit-form",
+  "version": "0.1.0",
+  "description": "Performant React forms where every field is a Jotai atom",
+  "keywords": [
+    "react",
+    "form",
+    "forms",
+    "jotai",
+    "field-array",
+    "validation"
+  ],
+  "license": "MIT",
+  "author": "Wit By Bit",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "src/**"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/witbybit/wit-form"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "build-ts": "tsc",
+    "test": "vitest run --environment jsdom",
+    "prepare": "husky install",
+    "format": "prettier . --write",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "peerDependencies": {
+    "jotai": ">=2.0.0",
+    "react": ">=17"
+  },
+  "devDependencies": {
+    "@storybook/addon-essentials": "^8.2.8",
+    "@storybook/addon-interactions": "^8.2.8",
+    "@storybook/addon-links": "^8.2.8",
+    "@storybook/blocks": "^8.2.8",
+    "@storybook/react": "^8.2.8",
+    "@storybook/react-vite": "^8.2.8",
+    "@storybook/testing-library": "^0.2.2",
+    "@types/react": "^17.0.11",
+    "@types/react-dom": "^17.0.8",
+    "husky": "^9.1.4",
+    "jotai": "^2.20.3",
+    "jsdom": "^24.1.1",
+    "lint-staged": "^15.2.8",
+    "prettier": "^3.3.3",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
+    "storybook": "^8.2.8",
+    "tslib": "^2.6.3",
+    "tsup": "^8.2.4",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.1"
+  },
+  "lint-staged": {
+    "*": "prettier --ignore-unknown --write"
+  }
+}
