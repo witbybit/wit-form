@@ -73,13 +73,13 @@ export function Features() {
           {features.map((feature) => (
             <article
               key={feature.title}
-              className="group relative overflow-hidden rounded-2xl border bg-fd-card/50 p-6 transition duration-300 hover:-translate-y-0.5 hover:border-indigo-500/30 hover:bg-fd-card motion-reduce:hover:translate-y-0"
+              className="group relative overflow-hidden rounded-2xl border bg-fd-card/50 p-6 transition duration-300 hover:-translate-y-0.5 hover:border-emerald-500/30 hover:bg-fd-card motion-reduce:hover:translate-y-0"
             >
               <div
                 aria-hidden
-                className="absolute -top-16 -right-16 size-40 rounded-full bg-indigo-500/0 blur-3xl transition duration-500 group-hover:bg-indigo-500/15"
+                className="absolute -top-16 -right-16 size-40 rounded-full bg-emerald-500/0 blur-3xl transition duration-500 group-hover:bg-emerald-500/15"
               />
-              <div className="mb-5 grid size-10 place-items-center rounded-lg border bg-fd-background text-indigo-600 dark:text-indigo-300">
+              <div className="mb-5 grid size-10 place-items-center rounded-lg border bg-fd-background text-emerald-700 dark:text-emerald-300">
                 <feature.icon className="size-5" strokeWidth={1.75} />
               </div>
               <h3 className="mb-2 font-semibold">{feature.title}</h3>

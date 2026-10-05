@@ -14,11 +14,11 @@ export function PerformanceCallout() {
         <div className="relative isolate overflow-hidden rounded-3xl border bg-zinc-950 px-6 py-12 text-zinc-100 [color-scheme:dark] sm:px-12 sm:py-16">
           <div
             aria-hidden
-            className="absolute inset-0 -z-10 bg-[radial-gradient(60%_80%_at_100%_0%,rgb(99_102_241/0.3),transparent),radial-gradient(40%_60%_at_0%_100%,rgb(217_70_239/0.15),transparent)]"
+            className="absolute inset-0 -z-10 bg-[radial-gradient(60%_80%_at_100%_0%,rgb(16_185_129/0.28),transparent),radial-gradient(40%_60%_at_0%_100%,rgb(132_204_22/0.12),transparent)]"
           />
           <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_1fr]">
             <div className="flex flex-col items-start gap-5">
-              <span className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-indigo-300">
+              <span className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-emerald-300">
                 <Gauge className="size-4" /> Built for big forms
               </span>
               <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">

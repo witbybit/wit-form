@@ -54,7 +54,7 @@ export function InstallCommand(props: { className?: string }) {
             className={cn(
               'relative px-3 py-2 font-mono text-xs transition-colors outline-none focus-visible:text-fd-foreground',
               manager === name
-                ? 'text-fd-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-px after:bg-indigo-500'
+                ? 'text-fd-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-px after:bg-emerald-500'
                 : 'text-fd-muted-foreground hover:text-fd-foreground'
             )}
           >
@@ -64,7 +64,7 @@ export function InstallCommand(props: { className?: string }) {
       </div>
       <div className="flex items-center gap-3 py-2.5 pr-2 pl-4">
         <code className="flex-1 truncate font-mono text-sm">
-          <span className="select-none text-indigo-600 dark:text-indigo-400">
+          <span className="select-none text-emerald-700 dark:text-emerald-400">
             ${' '}
           </span>
           {managers[manager]}
@@ -73,7 +73,7 @@ export function InstallCommand(props: { className?: string }) {
           type="button"
           onClick={copy}
           aria-label={copied ? 'Copied' : 'Copy install command'}
-          className="grid size-8 place-items-center rounded-md text-fd-muted-foreground transition hover:bg-fd-accent hover:text-fd-foreground focus-visible:ring-2 focus-visible:ring-indigo-500 outline-none"
+          className="grid size-8 place-items-center rounded-md text-fd-muted-foreground transition hover:bg-fd-accent hover:text-fd-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none"
         >
           {copied ? (
             <Check className="size-4 text-emerald-500" />

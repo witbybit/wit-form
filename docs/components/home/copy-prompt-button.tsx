@@ -47,14 +47,14 @@ export function CopyPromptButton(props: { className?: string }) {
       onClick={copy}
       title="Copy a prompt for ChatGPT, Claude, Cursor or any AI assistant"
       className={cn(
-        'group inline-flex h-11 items-center justify-center gap-2 rounded-lg border bg-fd-background/60 px-5 text-sm font-medium text-fd-foreground backdrop-blur transition outline-none hover:border-indigo-500/40 hover:bg-fd-accent focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-fd-background active:scale-[0.98]',
+        'group inline-flex h-11 items-center justify-center gap-2 rounded-lg border bg-fd-background/60 px-5 text-sm font-medium text-fd-foreground backdrop-blur transition outline-none hover:border-emerald-500/40 hover:bg-fd-accent focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-fd-background active:scale-[0.98]',
         props.className
       )}
     >
       {copied ? (
         <Check className="size-4 text-emerald-500" />
       ) : (
-        <Sparkles className="size-4 text-indigo-600 transition group-hover:rotate-12 dark:text-indigo-300" />
+        <Sparkles className="size-4 text-emerald-700 transition group-hover:rotate-12 dark:text-emerald-300" />
       )}
       {copied ? 'Prompt copied' : 'Copy AI prompt'}
       <span aria-live="polite" className="sr-only">

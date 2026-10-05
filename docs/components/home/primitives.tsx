@@ -27,7 +27,7 @@ export function SectionHeading(props: {
         centered && 'mx-auto items-center text-center'
       )}
     >
-      <p className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
+      <p className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">
         {props.eyebrow}
       </p>
       <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
@@ -56,7 +56,7 @@ export function ButtonLink({
   return (
     <Link
       className={cn(
-        'group inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-fd-background active:scale-[0.98]',
+        'group inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-fd-background active:scale-[0.98]',
         buttonStyles[variant],
         className
       )}
@@ -88,7 +88,7 @@ export function Window(props: {
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-xl border border-white/10 bg-zinc-950 text-zinc-100 shadow-2xl shadow-indigo-950/20 [color-scheme:dark]',
+        'overflow-hidden rounded-xl border border-white/10 bg-zinc-950 text-zinc-100 shadow-2xl shadow-emerald-950/20 [color-scheme:dark]',
         props.className
       )}
     >

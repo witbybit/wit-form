@@ -16,7 +16,7 @@ function CellGrid(props: { mode: 'all' | 'one' }) {
           '--wf-hot':
             props.mode === 'all'
               ? 'rgb(244 63 94 / 0.75)'
-              : 'rgb(99 102 241 / 0.9)',
+              : 'rgb(16 185 129 / 0.9)',
         } as CSSProperties
       }
     >
@@ -49,7 +49,7 @@ function Panel(props: {
       className={cn(
         'flex flex-col gap-6 rounded-2xl border p-6 sm:p-8',
         ours
-          ? 'border-indigo-500/30 bg-gradient-to-b from-indigo-500/[0.07] to-transparent'
+          ? 'border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.07] to-transparent'
           : 'bg-fd-card/50'
       )}
     >
@@ -58,7 +58,7 @@ function Panel(props: {
           className={cn(
             'font-mono text-xs uppercase tracking-wider',
             ours
-              ? 'text-indigo-600 dark:text-indigo-300'
+              ? 'text-emerald-600 dark:text-emerald-300'
               : 'text-fd-muted-foreground'
           )}
         >
@@ -68,7 +68,7 @@ function Panel(props: {
           className={cn(
             'rounded-full px-2.5 py-0.5 font-mono text-xs',
             ours
-              ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-300'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
               : 'bg-rose-500/10 text-rose-600 dark:text-rose-300'
           )}
         >

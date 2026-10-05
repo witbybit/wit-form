@@ -90,7 +90,7 @@ function DemoField(props: {
           'block w-full rounded-md border bg-white/[0.04] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 transition outline-none focus:bg-white/[0.06] focus:ring-2',
           error
             ? 'border-red-500/60 focus:ring-red-500/40'
-            : 'border-white/10 focus:border-indigo-400/60 focus:ring-indigo-500/30'
+            : 'border-white/10 focus:border-emerald-400/60 focus:ring-emerald-500/30'
         )}
       />
       {error && (
@@ -156,7 +156,7 @@ function SignupForm() {
         <button
           type="submit"
           disabled={formState.isSubmitting}
-          className="inline-flex h-9 w-full items-center justify-center rounded-md bg-indigo-500 text-sm font-medium text-white transition hover:bg-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-300 outline-none active:scale-[0.99] disabled:opacity-60"
+          className="inline-flex h-9 w-full items-center justify-center rounded-md bg-emerald-400 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-200 outline-none active:scale-[0.99] disabled:opacity-60"
         >
           {formState.isSubmitting
             ? 'Submitting…'
@@ -175,7 +175,7 @@ export function LiveDemo() {
     <div className="relative">
       <div
         aria-hidden
-        className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-indigo-500/25 via-violet-500/10 to-transparent blur-2xl"
+        className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-emerald-500/20 via-teal-500/10 to-transparent blur-2xl"
       />
       <Window
         title="signup-form.tsx"

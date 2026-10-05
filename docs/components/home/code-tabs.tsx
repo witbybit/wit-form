@@ -68,9 +68,9 @@ export function CodeTabs(props: { tabs: CodeTab[] }) {
             tabIndex={active === i ? 0 : -1}
             onClick={() => setActive(i)}
             className={cn(
-              'shrink-0 rounded-full border px-4 py-1.5 text-sm transition outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
+              'shrink-0 rounded-full border px-4 py-1.5 text-sm transition outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
               active === i
-                ? 'border-indigo-500/40 bg-indigo-500/10 text-fd-foreground'
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-fd-foreground'
                 : 'border-transparent text-fd-muted-foreground hover:text-fd-foreground'
             )}
           >

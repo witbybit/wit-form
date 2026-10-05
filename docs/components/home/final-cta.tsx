@@ -7,7 +7,7 @@ export function FinalCta() {
     <section className="relative isolate overflow-hidden border-t py-24 sm:py-32">
       <div
         aria-hidden
-        className="absolute bottom-[-40%] left-1/2 -z-10 h-[420px] w-[800px] -translate-x-1/2 rounded-full bg-indigo-500/15 blur-[120px]"
+        className="absolute bottom-[-40%] left-1/2 -z-10 h-[420px] w-[800px] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-[120px]"
       />
       <Container className="flex flex-col items-center gap-8 text-center">
         <h2 className="max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">

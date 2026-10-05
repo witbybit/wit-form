@@ -167,7 +167,7 @@ export async function CodeShowcase() {
                 <p className="text-fd-muted-foreground">{tab.body}</p>
                 <Link
                   href={tab.href}
-                  className="group mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200"
+                  className="group mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 dark:hover:text-emerald-200"
                 >
                   Read the guide
                   <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
