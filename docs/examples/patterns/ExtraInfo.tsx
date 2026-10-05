@@ -50,7 +50,7 @@ function AssigneePicker() {
             }
             className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm ring-1 ${
               fieldValue === member.id
-                ? 'bg-indigo-50 ring-indigo-500'
+                ? 'bg-emerald-50 ring-emerald-500'
                 : 'ring-slate-200 hover:bg-slate-50'
             }`}
           >

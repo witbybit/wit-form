@@ -68,7 +68,7 @@ function ProfilePreview() {
         </p>
         {values.bio && <p className="text-sm text-slate-700">{values.bio}</p>}
         {values.links?.website && (
-          <p className="truncate text-sm text-indigo-600">
+          <p className="truncate text-sm text-emerald-700">
             {values.links.website}
           </p>
         )}

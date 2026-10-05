@@ -21,7 +21,7 @@ function Input(props: {
         {props.label}
       </span>
       <input
-        className="block w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        className="block w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
         value={props.value}
         onChange={props.onChange}
         onBlur={props.onBlur}
@@ -66,7 +66,7 @@ function NewsletterForm() {
                     >
                       <input
                         type="radio"
-                        className="accent-indigo-600"
+                        className="accent-emerald-600"
                         checked={value === frequency}
                         onChange={() => onChange(frequency)}
                       />
@@ -88,7 +88,7 @@ function NewsletterForm() {
                   <label className="flex items-center gap-2 text-sm capitalize">
                     <input
                       type="checkbox"
-                      className="accent-indigo-600"
+                      className="accent-emerald-600"
                       checked={!!value}
                       onChange={() => onChange(!value)}
                     />

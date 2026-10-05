@@ -38,7 +38,7 @@ export function Card(props: { children: ReactNode; className?: string }) {
 
 const buttonVariants = {
   primary:
-    'bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600 disabled:bg-indigo-300',
+    'bg-emerald-700 text-white hover:bg-emerald-600 focus-visible:outline-emerald-700 disabled:bg-emerald-300',
   secondary:
     'bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 disabled:text-slate-400',
   danger:

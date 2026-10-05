@@ -30,7 +30,7 @@ function TextField(props: {
       <input
         id={props.name}
         type={props.type ?? 'text'}
-        className="block w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        className="block w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
         value={fieldValue ?? ''}
         onChange={(e) => setFieldValue(e.target.value)}
         onBlur={onBlur}

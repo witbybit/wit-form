@@ -58,7 +58,7 @@ const inputClass =
 function inputRing(error: unknown) {
   return error
     ? 'ring-red-300 focus:ring-red-500'
-    : 'ring-slate-300 focus:ring-indigo-600';
+    : 'ring-slate-300 focus:ring-emerald-600';
 }
 
 function FieldShell(props: {
@@ -307,7 +307,7 @@ export function CheckboxField(
         <input
           id={id}
           type="checkbox"
-          className="mt-0.5 h-4 w-4 accent-indigo-600"
+          className="mt-0.5 h-4 w-4 accent-emerald-600"
           checked={!!fieldValue}
           disabled={props.disabled}
           aria-invalid={!!error}

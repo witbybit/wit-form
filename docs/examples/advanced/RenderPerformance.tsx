@@ -52,7 +52,7 @@ function BudgetCell(props: { rowId: number; quarter: Quarter }) {
         <input
           type="number"
           aria-label={`${props.quarter} budget`}
-          className="w-24 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-right text-xs tabular-nums focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="w-24 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-right text-xs tabular-nums focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           value={fieldValue ?? ''}
           onChange={(e) =>
             setFieldValue(

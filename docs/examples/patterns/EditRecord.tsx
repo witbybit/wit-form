@@ -155,7 +155,7 @@ function UserEditor() {
           <label className="flex items-center gap-2 text-xs text-slate-600">
             <input
               type="checkbox"
-              className="accent-indigo-600"
+              className="accent-emerald-600"
               checked={failNextSave}
               onChange={(e) => setFailNextSave(e.target.checked)}
             />

@@ -50,7 +50,7 @@ function AmountField(props: { balance: number }) {
           className={`block w-full rounded-md border-0 py-1.5 pl-6 text-sm shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset ${
             error
               ? 'ring-red-300 focus:ring-red-500'
-              : 'ring-slate-300 focus:ring-indigo-600'
+              : 'ring-slate-300 focus:ring-emerald-600'
           }`}
           value={fieldValue ?? ''}
           onChange={(e) =>

@@ -158,7 +158,7 @@ function SignupWizard() {
               aria-current={index === step ? 'step' : undefined}
               className={`flex-1 border-t-4 pt-2 ${
                 index <= step
-                  ? 'border-indigo-600 text-indigo-700'
+                  ? 'border-emerald-600 text-emerald-800'
                   : 'border-slate-200 text-slate-400'
               }`}
             >

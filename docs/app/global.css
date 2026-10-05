@@ -40,3 +40,30 @@ html > body[data-scroll-locked] {
     }
   }
 }
+
+/* Brand accent for the docs UI (active links, TOC, focus rings), matching the landing page.
+   Surfaces stay on the neutral preset. */
+:root {
+  --color-fd-primary: oklch(50.8% 0.118 165.612); /* emerald-700 */
+  --color-fd-primary-foreground: oklch(98.5% 0 0);
+  --color-fd-ring: oklch(59.6% 0.145 163.225); /* emerald-600 */
+}
+
+.dark {
+  --color-fd-primary: oklch(76.5% 0.177 163.223); /* emerald-400 */
+  --color-fd-primary-foreground: oklch(14.1% 0.005 285.823); /* zinc-950 */
+  --color-fd-ring: oklch(69.6% 0.17 162.48); /* emerald-500 */
+}
+
+/* Sidebar search: a little taller, with the brand accent on hover */
+#nd-sidebar [data-search-full] {
+  min-height: 2.25rem;
+  transition:
+    border-color 150ms,
+    background-color 150ms,
+    color 150ms;
+}
+
+#nd-sidebar [data-search-full]:hover {
+  border-color: color-mix(in oklab, var(--color-fd-primary) 45%, transparent);
+}
