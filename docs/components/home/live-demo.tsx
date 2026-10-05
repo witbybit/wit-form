@@ -1,9 +1,19 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { FormProvider, useField, useForm, useFormValues } from 'wit-form';
 import { cn } from '@/lib/cn';
 import { Window } from './primitives';
+
+/** Broadcasts "reset" to every counter, so they can start again from zero */
+const CounterReset = createContext<EventTarget | null>(null);
 
 /**
  * Shows how many times its parent component has committed, and flashes on every new one.
@@ -12,6 +22,17 @@ import { Window } from './primitives';
 function RenderBadge(props: { label?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const count = useRef(0);
+  const reset = useContext(CounterReset);
+
+  useEffect(() => {
+    if (!reset) return;
+    const onReset = () => {
+      count.current = 0;
+      if (ref.current) ref.current.textContent = '0';
+    };
+    reset.addEventListener('reset', onReset);
+    return () => reset.removeEventListener('reset', onReset);
+  }, [reset]);
 
   useEffect(() => {
     count.current += 1;
@@ -171,6 +192,27 @@ function SignupForm() {
 }
 
 export function LiveDemo() {
+  const [reset] = useState(() => new EventTarget());
+  const started = useRef(false);
+
+  const resetCounters = () => reset.dispatchEvent(new Event('reset'));
+
+  // Mounting renders each component a few times (twice over in StrictMode), which says
+  // nothing about typing. Counting starts once the visitor first focuses a field.
+  const onFocus = () => {
+    if (started.current) return;
+    started.current = true;
+    resetCounters();
+  };
+
+  // Also zero them once the form has settled, so the demo opens at 0 rather than at mount noise
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!started.current) reset.dispatchEvent(new Event('reset'));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [reset]);
+
   return (
     <div className="relative">
       <div
@@ -180,19 +222,34 @@ export function LiveDemo() {
       <Window
         title="signup-form.tsx"
         badge={
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
-            <span className="size-1.5 rounded-full bg-emerald-400 motion-safe:animate-pulse" />
-            live
+          <span className="flex items-center gap-2">
+            <button
+              type="button"
+              // Keeps focus in the field, so the blur's own render doesn't land after the reset
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={resetCounters}
+              className="rounded px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 transition outline-none hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-emerald-500"
+            >
+              reset counters
+            </button>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
+              <span className="size-1.5 rounded-full bg-emerald-400 motion-safe:animate-pulse" />
+              live
+            </span>
           </span>
         }
       >
-        <FormProvider>
-          <SignupForm />
-        </FormProvider>
+        <CounterReset.Provider value={reset}>
+          <div onFocus={onFocus}>
+            <FormProvider>
+              <SignupForm />
+            </FormProvider>
+          </div>
+        </CounterReset.Provider>
       </Window>
       <p className="mt-3 text-center text-xs text-fd-muted-foreground">
-        Type in a field. Only its counter, and the preview that watches it, go
-        up.
+        The counters show renders. Type in a field: only its counter, and the
+        preview that watches it, go up.
       </p>
     </div>
   );

@@ -97,7 +97,7 @@ function Panel(props: {
 
 export function RenderComparison() {
   return (
-    <section className="py-20 sm:py-28">
+    <section className="pt-16 pb-20 sm:pt-20 sm:pb-28">
       <Container className="flex flex-col gap-12">
         <SectionHeading
           eyebrow="Why atoms"

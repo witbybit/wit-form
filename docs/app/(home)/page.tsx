@@ -1,4 +1,5 @@
 import { CodeShowcase } from '@/components/home/code-showcase';
+import { Faq } from '@/components/home/faq';
 import { Features } from '@/components/home/features';
 import { FinalCta } from '@/components/home/final-cta';
 import { Footer } from '@/components/home/footer';
@@ -15,6 +16,7 @@ export default function HomePage() {
         <CodeShowcase />
         <Features />
         <PerformanceCallout />
+        <Faq />
         <FinalCta />
       </main>
       <Footer />

@@ -9,6 +9,8 @@ const links = [
   { label: 'Examples', href: '/docs/examples' },
   { label: 'API', href: '/docs/api/use-form' },
   { label: 'llms.txt', href: '/llms.txt' },
+  { label: 'npm', href: 'https://www.npmjs.com/package/wit-form' },
+  { label: 'License', href: `${repoUrl}/blob/${gitConfig.branch}/LICENSE` },
 ];
 
 export function Footer() {

@@ -19,6 +19,21 @@ const features: { icon: LucideIcon; title: string; body: string }[] = [
     body: 'Each field is its own Jotai atom. Typing re-renders that field and nothing else, even in forms with thousands of inputs.',
   },
   {
+    icon: Eye,
+    title: 'Live values without re-renders',
+    body: 'Watch one field, one table column or the whole form. Only the component that watches re-renders.',
+  },
+  {
+    icon: Tags,
+    title: 'Extra info per field',
+    body: "Store data next to a value, like a select option's label, and get it back in onSubmit.",
+  },
+  {
+    icon: Braces,
+    title: 'Nested values from dot paths',
+    body: 'Name a field address.city and submit gets { address: { city } }. No reshaping needed.',
+  },
+  {
     icon: Layers,
     title: 'Field arrays',
     body: 'Add, insert and remove rows, including lists inside lists, with stable row ids.',
@@ -29,24 +44,9 @@ const features: { icon: LucideIcon; title: string; body: string }[] = [
     body: 'Per field, per list and form-wide, with rules that depend on other fields or on props.',
   },
   {
-    icon: Eye,
-    title: 'Live values without re-renders',
-    body: 'Watch one field, one table column or the whole form. Only the component that watches re-renders.',
-  },
-  {
     icon: Puzzle,
     title: 'Headless, bring your own inputs',
     body: 'No UI ships with the library. Wire useField to native inputs or to your design system.',
-  },
-  {
-    icon: Braces,
-    title: 'Nested values from dot paths',
-    body: 'Name a field address.city and submit gets { address: { city } }. No reshaping needed.',
-  },
-  {
-    icon: Tags,
-    title: 'Extra info per field',
-    body: "Store data next to a value, like a select option's label, and get it back in onSubmit.",
   },
   {
     icon: Workflow,

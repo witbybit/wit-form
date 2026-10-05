@@ -27,7 +27,6 @@ function TextField({ name, label }: { name: string; label: string }) {
         value={fieldValue ?? ''}
         onChange={(e) => setFieldValue(e.target.value)}
         onBlur={onBlur}
-        aria-invalid={!!error}
       />
       {error && <span role="alert">{error}</span>}
     </label>
@@ -35,21 +34,17 @@ function TextField({ name, label }: { name: string; label: string }) {
 }
 
 function Profile() {
-  const { handleSubmit } = useForm({ onSubmit: (values) => save(values) });
+  const { handleSubmit } = useForm({ onSubmit: save });
   return (
     <form onSubmit={handleSubmit}>
       <TextField name="name" label="Name" />
       <TextField name="address.city" label="City" />
-      <button type="submit">Save</button>
+      <button>Save</button>
     </form>
   );
 }
 
-export default () => (
-  <FormProvider>
-    <Profile />
-  </FormProvider>
-);`,
+export const ProfileForm = () => <FormProvider><Profile /></FormProvider>;`,
   },
   {
     id: 'arrays',

@@ -2,8 +2,11 @@ import { ArrowRight, Gauge } from 'lucide-react';
 import { ButtonLink, Container } from './primitives';
 
 const stats = [
-  { value: '2,000', label: 'inputs in one form' },
-  { value: '1 cell', label: 're-renders as you type, plus its column total' },
+  { value: '2,000', label: 'inputs in one form: 500 rows × 4 quarters' },
+  {
+    value: '2',
+    label: 'components re-render per edit: the cell and its total',
+  },
   { value: '0', label: 'selectors to write' },
 ];
 

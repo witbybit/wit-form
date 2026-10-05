@@ -5,13 +5,18 @@ import { InstallCommand } from './install-command';
 import { LiveDemo } from './live-demo';
 import { ButtonLink, Container } from './primitives';
 
-const facts = ['~7 kB gzipped', 'No dependencies', 'TypeScript', 'React 18+'];
+const facts = [
+  '~7 kB gzipped',
+  'Jotai is the only dependency',
+  'TypeScript',
+  'React 18+',
+];
 
 export function Hero() {
   return (
     <section className="relative isolate overflow-hidden">
       <BackgroundGrid />
-      <Container className="grid items-center gap-14 pt-16 pb-20 md:pt-24 lg:grid-cols-[1.1fr_1fr] lg:gap-12 lg:pb-28">
+      <Container className="grid items-center gap-14 pt-16 pb-12 md:pt-24 lg:grid-cols-[1.1fr_1fr] lg:gap-12 lg:pb-16">
         <div className="flex flex-col items-start gap-7">
           <a
             href={`https://github.com/${gitConfig.user}/${gitConfig.repo}`}
@@ -47,11 +52,11 @@ export function Hero() {
 
           <InstallCommand />
 
-          <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-fd-muted-foreground">
+          <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-fd-muted-foreground">
             {facts.map((fact) => (
               <li key={fact} className="flex items-center gap-1.5">
                 <span
-                  className="size-1 rounded-full bg-emerald-500"
+                  className="size-1.5 rounded-full bg-emerald-500"
                   aria-hidden
                 />
                 {fact}
