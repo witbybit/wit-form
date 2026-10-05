@@ -1,0 +1,28 @@
+---
+title: 'Migrating from react-recoil-form'
+description: 'Wit Form is the successor to react-recoil-form. It has the same API, with Jotai in place of Recoil, and it works on React 18 and newer.'
+---
+
+## Steps
+
+1. Swap the dependencies:
+
+   ```sh
+   pnpm remove react-recoil-form recoil
+   pnpm add wit-form jotai
+   ```
+
+2. Change your imports:
+
+   ```diff
+   - import { useForm, useField } from 'react-recoil-form';
+   + import { useForm, useField } from 'wit-form';
+   ```
+
+3. Remove any `RecoilRoot` you added only for forms. Each `FormProvider` creates its own store.
+
+That's all most apps need. Hooks, options and return values have the same names and behaviour.
+
+## The `skipRecoilRoot` option
+
+`FormProvider`'s `skipRecoilRoot` option still works, as an alias of the new name `skipJotaiProvider`. Switch to `skipJotaiProvider` when convenient. Both keep the form's state in the surrounding Jotai store instead of a new one. See [FormProvider](/docs/api/form-provider).

@@ -1,0 +1,43 @@
+---
+title: 'Performance'
+description: "Wit Form is fast by default: changing a field re-renders that field and the components watching it, nothing else. You don't need React.memo or careful prop drilling. This page explains the few things that can undo that, and the options for very large forms."
+---
+
+See the [Render Performance example](/docs/examples/advanced/render-performance): a table of up to 2,000 inputs with render counters on every cell.
+
+## What re-renders when a value changes
+
+| Component                                                                      | Re-renders?                             |
+| ------------------------------------------------------------------------------ | --------------------------------------- |
+| The field you typed in (`useField`)                                            | Yes                                     |
+| Other fields                                                                   | No                                      |
+| Components watching that field (`useFieldWatch`, column watches)               | Yes                                     |
+| Components watching other fields                                               | No                                      |
+| The component that calls `useForm`                                             | No                                      |
+| A component that calls `useFieldArray` **without** `validate`                  | No, only when rows are added or removed |
+| A component that calls `useFieldArray` **with** `validate`                     | Yes, for any change in its rows         |
+| Components using `useFormValues`, `useFormValuesAndExtraInfos` or `useIsDirty` | Yes, for any change                     |
+
+## Tips
+
+**Watch in small components.** Call watch hooks in the smallest component that shows the value, not in the form component. See [Watching Values](/docs/guides/watching-values).
+
+**Read in event handlers, don't watch.** If a value is only needed when something is clicked, read it with `getValue` or `getValues` from `useFormContext`. Reading doesn't subscribe to anything.
+
+**Validate large arrays at the form level.** A field array `validate` subscribes to every value in the array. For a table with hundreds of rows, leave it out and check the rows in `useForm`'s `validate`, which only runs on submit.
+
+**Keep functions and arrays stable.** Define validators outside components, or memoize them. Memoize `ancestors` arrays with `useMemo`. New objects on every render make hooks redo work.
+
+**Use `useFormValues` sparingly.** It re-renders on every keystroke anywhere in the form. That's fine for a small debug panel, but not for a component that renders a lot.
+
+## Turning off whole-form tracking
+
+To keep `useFormValues` and `useIsDirty` live, each `FormProvider` tracks the values of the whole form. On very large forms that don't use those two hooks, turn it off:
+
+```tsx
+<FormProvider options={{ skipValuesObserver: true }}>
+  <BigSpreadsheet />
+</FormProvider>
+```
+
+With this option, `useFormValues`, `useFormValuesAndExtraInfos` and `useIsDirty` stop updating. Everything else, including submit, validation, `getValues` and `checkIsDirty()`, still works.

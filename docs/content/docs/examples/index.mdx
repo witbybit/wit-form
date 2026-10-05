@@ -1,0 +1,141 @@
+---
+title: 'Overview'
+description: 'Complete, working forms. Each example has a live preview and its full source.'
+---
+
+Every example below is a real form you can type into. Open the **Code** tab on any example to read the whole file. The panel next to most examples shows the form's live values, whether it's dirty, and the last submitted values.
+
+## Getting Started
+
+<Cards>
+  <Card title="Quick Start" href="/docs/examples/getting-started/quick-start">
+    Fill in the form and submit. Leave a required field empty to see its error
+    after you blur it or submit.
+  </Card>
+  <Card
+    title="Field Component"
+    href="/docs/examples/getting-started/field-component"
+  >
+    The same form features without writing a hook per input. Submit with the
+    email empty to see the built-in required check.
+  </Card>
+</Cards>
+
+## Validation
+
+<Cards>
+  <Card title="Field Rules" href="/docs/examples/validation/field-rules">
+    Errors show after you leave a field, or for every field when you submit.
+    Validation itself runs on every change, so an error clears as soon as you
+    fix it.
+  </Card>
+  <Card
+    title="Cross-field Rules"
+    href="/docs/examples/validation/cross-field-rules"
+  >
+    The new password can't match the current one, and the confirmation must
+    match the new password. Change the new password after confirming it and the
+    confirmation re-validates.
+  </Card>
+  <Card title="Dynamic Rules" href="/docs/examples/validation/dynamic-rules">
+    The amount starts above your balance, so submitting fails. Add funds and
+    submit again: the same amount is now checked against the new balance.
+  </Card>
+  <Card
+    title="Form-level Rules"
+    href="/docs/examples/validation/form-level-rules"
+  >
+    The initial values break several booking rules. Submit to see form-level
+    errors next to field errors, then fix them.
+  </Card>
+</Cards>
+
+## Field Arrays
+
+<Cards>
+  <Card title="Invoice" href="/docs/examples/field-arrays/invoice">
+    Add, duplicate and remove line items. Row amounts and the total update as
+    you type, and each one re-renders only when the values it watches change.
+  </Card>
+  <Card title="Nested Arrays" href="/docs/examples/field-arrays/nested-arrays">
+    A field array inside a field array. Each section has its own list of lessons
+    and its own running duration.
+  </Card>
+</Cards>
+
+## Watching Values
+
+<Cards>
+  <Card
+    title="Conditional Fields"
+    href="/docs/examples/watching-values/conditional-fields"
+  >
+    Change the answers and watch fields appear and disappear. When a field
+    unmounts its value is removed, so hidden fields never leak into the
+    submitted values.
+  </Card>
+  <Card title="Live Preview" href="/docs/examples/watching-values/live-preview">
+    The preview and the character counter watch only the fields they show. The
+    yellow badges count renders: the form itself never re-renders as you type.
+  </Card>
+</Cards>
+
+## Patterns
+
+<Cards>
+  <Card
+    title="Multi-step Wizard"
+    href="/docs/examples/patterns/multi-step-wizard"
+  >
+    Each step is validated before you can move on. Go back and forth: values
+    from hidden steps are kept, and the review step reads them all.
+  </Card>
+  <Card title="Edit a Record" href="/docs/examples/patterns/edit-a-record">
+    Change something and the Save button turns on. Discard puts the loaded
+    values back. Turn on “Fail the next save” to see a failed save keep your
+    edits.
+  </Card>
+  <Card
+    title="Imperative Updates"
+    href="/docs/examples/patterns/imperative-updates"
+  >
+    Fill fields from code: load a saved address, look up a city from a ZIP code,
+    copy one address into another, or clear one.
+  </Card>
+  <Card
+    title="Extra Info & Files"
+    href="/docs/examples/patterns/extra-info-and-files"
+  >
+    Each field can carry an extraInfo next to its value. Pick an assignee and
+    upload an image, then compare the values and extra infos on the right.
+  </Card>
+</Cards>
+
+## Advanced
+
+<Cards>
+  <Card
+    title="Render Performance"
+    href="/docs/examples/advanced/render-performance"
+  >
+    Edit any cell and watch the yellow render counters: only that cell and its
+    column total re-render, however many rows there are.
+  </Card>
+  <Card
+    title="Outside the Provider"
+    href="/docs/examples/advanced/outside-the-provider"
+  >
+    The order summary lives outside the form's FormProvider, in a different part
+    of the page. It reads and updates the form through its formId.
+  </Card>
+</Cards>
+
+## Shared components
+
+Wit Form ships no UI. The examples share a few field components built on [`useField`](/docs/api/use-field), the way you'd write them once for your own app:
+
+<include cwd lang="tsx" meta='title="examples/components/fields.tsx"'>
+  examples/components/fields.tsx
+</include>
+
+They also use small presentational helpers (buttons, cards and the form state panel) from `examples/components/ui.tsx`.

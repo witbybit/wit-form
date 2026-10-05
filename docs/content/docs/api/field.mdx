@@ -1,0 +1,120 @@
+---
+title: 'Field'
+description: "<Field> is a component version of useField. It connects one input to the form without a separate hook call. Use it for simple inputs, or when you'd rather not write a component per input type."
+---
+
+```ts
+import { Field } from 'wit-form';
+```
+
+It works in two ways.
+
+## With a child element
+
+`<Field>` passes the field's props to its child element:
+
+```tsx
+<Field name="email" required>
+  <MyInput label="Email" />
+</Field>
+```
+
+`MyInput` receives:
+
+| Prop        | Type                          | Description                                                            |
+| ----------- | ----------------------------- | ---------------------------------------------------------------------- |
+| `value`     | `any`                         | The current value, or `''` when there is none.                         |
+| `onChange`  | `(event) => void`             | Call it with the input's change **event**. Reads `event.target.value`. |
+| `onBlur`    | `() => void`                  | Marks the field as touched.                                            |
+| `error`     | `string \| null \| undefined` | The error, once the field is touched.                                  |
+| `touched`   | `boolean \| undefined`        | Whether the field is touched.                                          |
+| `extraInfo` | `any`                         | The field's extra info.                                                |
+
+A plain `<input>` works directly, since it already calls `onChange` with an event:
+
+```tsx
+<Field name="firstName">
+  <input />
+</Field>
+```
+
+## With a render function
+
+Pass a function as the child to control rendering yourself. Here `onChange` takes the **value**, not an event, which suits checkboxes, radio groups and custom widgets:
+
+```tsx
+<Field name="agree">
+  {({ value, onChange, error }) => (
+    <label>
+      <input
+        type="checkbox"
+        checked={!!value}
+        onChange={() => onChange(!value)}
+      />
+      I agree {error}
+    </label>
+  )}
+</Field>
+```
+
+The render function receives the same props as the child element. The difference is that `onChange(value, extraInfo?)` works like `setFieldValue` from `useField`.
+
+## Props
+
+### `name`
+
+**Type:** `string` · **Required**
+
+The field's name. Same as [`useField`'s `name`](/docs/api/use-field#name).
+
+### `children`
+
+**Type:** a React element, or `(props) => ReactNode` · **Required**
+
+The input to connect: an element that receives the props above, or a render function.
+
+### `required`
+
+**Type:** `boolean` · **Default:** `false`
+
+Adds a "Required" error when the value is empty. Only used when there is no `validate` prop. Empty means any falsy value: `''`, `undefined`, `null`, `0` and `false`. For number or checkbox fields where `0` or `false` is a valid answer, write your own `validate`.
+
+### `validate`
+
+**Type:** `(value, other?) => string | null | undefined` · **Default:** none
+
+A validator, like [`useField`'s `validate`](/docs/api/use-field#validate). When given, `required` is ignored.
+
+### `depFields`
+
+**Type:** same as `useField` · **Default:** none
+
+Fields whose values are passed to `validate`. See [`useField`'s `depFields`](/docs/api/use-field#depfields).
+
+### `defaultValue`
+
+**Type:** `any` · **Default:** none
+
+Used when there is no initial value. See [`useField`'s `defaultValue`](/docs/api/use-field#defaultvalue).
+
+### `ancestors`
+
+**Type:** `{ name: string; rowId: number }[]` · **Default:** none
+
+For fields inside field array rows. See [`useField`'s `ancestors`](/docs/api/use-field#ancestors).
+
+### `handleChange`
+
+**Type:** `(value: any) => void` · **Default:** none
+
+Called with the new value after each change, **in child element mode only**. Use it to react to changes, like clearing another field.
+
+## When to use `useField` instead
+
+`<Field>` covers the common cases. Use `useField` directly when you need:
+
+- `validateCallback` or `skipUnregister`, which `<Field>` doesn't accept;
+- typed values (`useField<number>`);
+- a reusable input component that's used across many forms.
+
+See both styles in the [Field Component example](/docs/examples/getting-started/field-component).

@@ -1,0 +1,27 @@
+---
+title: 'Invoice'
+description: 'Add, duplicate and remove line items. Row amounts and the total update as you type, and each one re-renders only when the values it watches change.'
+---
+
+import Invoice from '@/examples/field-arrays/Invoice';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <Invoice />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include cwd lang="tsx" meta='title="examples/field-arrays/Invoice.tsx"'>
+      examples/field-arrays/Invoice.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+[`useFieldArray`](/docs/api/use-field-array) manages the line items. Each row has a stable `rowId`, used as the React `key` and passed to the row's fields as `ancestors`. See [Field Arrays](/docs/guides/field-arrays).
+
+- `append`, `insert`, `remove` and `getFieldArrayValue` add, duplicate and remove rows.
+- `validate` on the array requires at least one row.
+- `RowAmount` watches one row's fields with `useFieldWatch`. `Totals` watches two columns with [`useFieldArrayColumnWatch`](/docs/api/watch-hooks#usefieldarraycolumnwatch). Each re-renders only when the values it reads change.

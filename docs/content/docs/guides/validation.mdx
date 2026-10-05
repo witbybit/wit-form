@@ -1,0 +1,206 @@
+---
+title: 'Validation'
+description: 'Wit Form validates at three levels: single fields, field arrays, and the whole form. This guide covers each one and when to use it.'
+---
+
+## Validators are plain functions
+
+Every validator follows one rule: **return an error message when something is wrong, and `null` (or `undefined`) when it's fine.**
+
+```ts
+const validateAge = (value?: number) =>
+  value !== undefined && value < 18 ? 'You must be 18 or older' : null;
+```
+
+There's no schema language to learn. Use any library you like inside a validator (Zod, Yup, validator.js) as long as you return a string or `null`.
+
+## Field validation
+
+Pass `validate` to `useField`:
+
+```tsx
+const validateEmail = (value?: string) => {
+  if (!value) return 'Required';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email';
+  return null;
+};
+
+function EmailField() {
+  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
+    name: 'email',
+    validate: validateEmail,
+  });
+  // ...render the input and `error`
+}
+```
+
+### When errors appear
+
+The validator runs **on every change**, but `error` is only returned once the field is **touched**: after `onBlur`, after a submit, or after you call `validateFields` on it. Connect `onBlur` to your input, or errors only appear on submit.
+
+### Define validators outside your component
+
+`validate` is read **once, when the field mounts**. If you write it inline, later versions of the function are ignored. Keep validators at module level, or memoize them:
+
+```tsx
+// ✅ Defined once, outside the component
+const validateName = (value?: string) => (!value ? 'Required' : null);
+
+function NameField() {
+  useField({ name: 'name', validate: validateName });
+}
+```
+
+Try it in the [Field Rules example](/docs/examples/validation/field-rules).
+
+## Rules that depend on other fields
+
+To compare a field with another one, like "confirm password" with "password", list the other fields in `depFields`. Their current values arrive in the validator's second argument as `other.values`:
+
+```tsx
+const validateConfirmation = (
+  value?: string,
+  other?: { values: { password?: string } }
+) => (value !== other?.values.password ? 'Passwords do not match' : null);
+
+useField({
+  name: 'confirmPassword',
+  depFields: ['password'],
+  validate: validateConfirmation,
+});
+```
+
+When `password` changes, `confirmPassword` re-validates automatically, even though the user didn't touch it.
+
+`depFields` takes field names, or `{ name, ancestors }` objects for fields inside a field array row.
+
+During a submit, `other.values` contains **every** form value, not only the `depFields`.
+
+See the [Cross-field Rules example](/docs/examples/validation/cross-field-rules).
+
+## Rules that depend on props or state
+
+Sometimes a rule depends on something outside the form, like the user's account balance passed in as a prop. Since `validate` is read only once, use `validateCallback` with `useCallback`:
+
+```tsx
+function AmountField({ balance }: { balance: number }) {
+  const validateCallback = useCallback(
+    (value?: number) =>
+      value !== undefined && value > balance ? 'Not enough funds' : null,
+    [balance]
+  );
+  const field = useField<number>({ name: 'amount', validateCallback });
+  // ...
+}
+```
+
+Wit Form always uses the latest `validateCallback`. The new rule takes effect the next time the field validates: when its value changes, or on submit.
+
+Keep the callback's dependencies stable. A new function on every render causes extra work.
+
+See the [Dynamic Rules example](/docs/examples/validation/dynamic-rules).
+
+## Field array validation
+
+A field array can validate its rows as a whole, for rules like "add at least one item" or "no duplicate emails":
+
+```tsx
+const validateItems = (rows: { email?: string }[]) => {
+  if (rows.length === 0) return 'Add at least one person';
+  const emails = rows.map((r) => r.email);
+  if (new Set(emails).size !== emails.length) return 'Emails must be unique';
+  return null;
+};
+
+const { error } = useFieldArray({
+  name: 'people',
+  fieldNames: ['email'],
+  validate: validateItems,
+});
+```
+
+The array's `error` comes from the hook's return value. It's checked whenever the rows change and on submit. Unlike field errors, it doesn't wait for a touch: it shows as soon as it's set. Fields inside the rows still validate themselves as usual.
+
+An array validator reads every row, so the component that calls `useFieldArray` re-renders whenever any value in the array changes. On very large tables, leave `validate` out and check the rows in the form-level `validate` instead. See [Performance](/docs/guides/performance).
+
+## Form-level validation
+
+For rules that don't belong to a single field, pass `validate` to `useForm`. It receives **all** values and returns a **list** of messages:
+
+```tsx
+useForm({
+  validate: (values) => {
+    const errors: string[] = [];
+    if (values.checkOut <= values.checkIn)
+      errors.push('Check-out must be after check-in.');
+    if (values.adults + values.children > 6)
+      errors.push('A room fits at most 6 guests.');
+    return errors;
+  },
+  onSubmit,
+  onError: (fieldErrors, formErrors) => {
+    // formErrors is the list returned above
+  },
+});
+```
+
+Form-level validation runs **only on submit**. Its messages aren't tied to a field, so show them yourself, for example in a banner, from `onError`.
+
+To change the form-level rule from a child component, use [useSetFormProps](/docs/api/use-set-form-props).
+
+See the [Form-level Rules example](/docs/examples/validation/form-level-rules).
+
+## What happens on submit
+
+`handleSubmit` runs, in this order:
+
+1. Every mounted field's validator, with all form values as `other.values`.
+2. Every field array's validator, and the validators of the fields in its rows.
+3. The form-level `validate`.
+
+Every field that failed becomes touched, so its error shows. Then:
+
+- If there were **any** errors, `onError(fieldErrors, formErrors, values)` is called, and `onSubmit` is not.
+- Otherwise, `onSubmit(values, extraInfos)` is called.
+
+`fieldErrors` is a list of objects describing each failing field:
+
+```ts
+{
+  name: 'email',          // the field's name
+  ancestors: [],          // the rows it belongs to, for fields in field arrays
+  type: 'field',          // 'field' or 'field-array'
+  error: 'Required',      // the message
+}
+```
+
+## Validating without submitting
+
+`useForm` gives you two functions for validating on demand. `validateAllFields` is also available from `useFormContext`:
+
+```tsx
+const { validateFields, validateAllFields } = useForm({ onSubmit });
+
+// Validate some fields, like the current step of a wizard
+const errors = validateFields(['email', 'password']);
+if (errors.length === 0) goToNextStep();
+
+// Validate every field and field array, without submitting
+const allErrors = validateAllFields();
+```
+
+Both return the same error objects as `onError` and mark failing fields as touched. Neither runs the form-level `validate`.
+
+`validateFields` accepts top-level names as strings. For a field inside a row, pass `{ name, type: 'field', ancestors }`. A string that matches a top-level field array validates that array.
+
+The [Multi-step Wizard example](/docs/examples/patterns/multi-step-wizard) uses `validateFields` to check each step.
+
+## The `<Field>` shortcut
+
+The [`<Field>` component](/docs/api/field) has a `required` prop that adds a "Required" check when you don't pass `validate`:
+
+```tsx
+<Field name="email" required>
+  <MyInput />
+</Field>
+```

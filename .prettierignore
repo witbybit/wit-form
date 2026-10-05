@@ -1,4 +1,7 @@
 pnpm-lock.yaml
 dist
-storybook-static
+docs/.next
+docs/out
+docs/.source
+docs/next-env.d.ts
 coverage

@@ -1,5 +1,5 @@
 {
-  "include": ["src", "test", "*.config.ts", ".storybook"],
+  "include": ["src", "test", "*.config.ts"],
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
@@ -16,7 +16,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    "paths": { "wit-form": ["./src/index.ts"] }
+    "noEmit": true
   }
 }

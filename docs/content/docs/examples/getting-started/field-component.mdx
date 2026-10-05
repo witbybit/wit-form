@@ -1,0 +1,32 @@
+---
+title: 'Field Component'
+description: 'The same form features without writing a hook per input. Submit with the email empty to see the built-in required check.'
+---
+
+import FieldComponent from '@/examples/getting-started/FieldComponent';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <FieldComponent />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/getting-started/FieldComponent.tsx"'
+    >
+      examples/getting-started/FieldComponent.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+[`<Field>`](/docs/api/field) connects inputs without writing a hook per input.
+
+- **Child element:** `<Field>` passes `value`, `onChange(event)`, `onBlur`, `error`, `touched` and `extraInfo` to its child.
+- **Render function:** `onChange` takes the new value directly, which suits radios, checkboxes and custom widgets.
+- `required` adds a "Required" check when there's no `validate`.
+- [`withFormProvider`](/docs/api/form-provider#withformprovidercomponent-options) wraps the form in a `FormProvider`.

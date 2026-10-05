@@ -1,3 +1,6 @@
+packages:
+  - docs
+
 # Supply-chain protections
 # Only install package versions that have been published for at least 3 days,
 # which gives the ecosystem time to catch compromised releases.

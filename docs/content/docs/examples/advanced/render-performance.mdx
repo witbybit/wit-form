@@ -1,0 +1,31 @@
+---
+title: 'Render Performance'
+description: 'Edit any cell and watch the yellow render counters: only that cell and its column total re-render, however many rows there are.'
+---
+
+import RenderPerformance from '@/examples/advanced/RenderPerformance';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <RenderPerformance />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/advanced/RenderPerformance.tsx"'
+    >
+      examples/advanced/RenderPerformance.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+Every field is its own Jotai atom, so typing in one cell re-renders that cell and its column total. Nothing else re-renders, whether the table has 100 rows or 500. See [Performance](/docs/guides/performance).
+
+- Each column total watches only its column with `useFieldArrayColumnWatch`.
+- The array has no `validate`, which would subscribe it to every value.
+- [`skipValuesObserver`](/docs/api/form-provider#skipvaluesobserver) turns off whole-form value tracking, since nothing here uses `useFormValues` or `useIsDirty`.

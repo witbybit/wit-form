@@ -1,0 +1,111 @@
+---
+title: 'FormProvider'
+description: 'FormProvider holds the state of one form. Every Wit Form hook, including useForm, must be called by a component inside it. Each FormProvider is independent, so several forms can share a page without mixing values.'
+---
+
+```ts
+import { FormProvider, withFormProvider } from 'wit-form';
+```
+
+## `<FormProvider>`
+
+```tsx
+<FormProvider options={{ skipValuesObserver: true }}>
+  <MyForm />
+</FormProvider>
+```
+
+### Props
+
+| Prop       | Type                  | Required | Description                    |
+| ---------- | --------------------- | -------- | ------------------------------ |
+| `children` | `ReactNode`           | Yes      | The form and its fields.       |
+| `options`  | `FormProviderOptions` | No       | See [Options](#options) below. |
+
+## `withFormProvider(Component, options?)`
+
+Wraps a component in a `FormProvider` and returns the new component. Props you pass to the result are forwarded to `Component`.
+
+```tsx
+function ProfileForm(props: { userId: string }) {
+  const { handleSubmit } = useForm({ onSubmit });
+  // ...
+}
+
+export default withFormProvider(ProfileForm);
+// <ProfileForm userId="u1" /> renders inside its own FormProvider
+```
+
+| Argument    | Type                  | Required | Description                 |
+| ----------- | --------------------- | -------- | --------------------------- |
+| `Component` | React component       | Yes      | The component to wrap.      |
+| `options`   | `FormProviderOptions` | No       | Same as the `options` prop. |
+
+This is the usual way to write a form: the component that calls `useForm` is the top of the form, and `withFormProvider` puts the provider above it.
+
+## Options
+
+All options are optional. Most forms don't need any.
+
+### `formId`
+
+**Type:** `string` · **Default:** a generated unique id
+
+A fixed name for the form. You only need it to reach the form from a component **outside** its `FormProvider`. See [Using a form outside its provider](#using-a-form-outside-its-provider). Two forms that are mounted at the same time must not share a `formId`.
+
+### `skipJotaiProvider`
+
+**Type:** `boolean` · **Default:** `false`
+
+By default each `FormProvider` creates its own Jotai store, which keeps forms isolated. With `skipJotaiProvider: true`, the form's state goes into the surrounding Jotai store instead: the nearest Jotai `<Provider>`, or Jotai's default store if there is none.
+
+Use it together with `formId` to read the form from outside its provider.
+
+### `skipRecoilRoot`
+
+**Type:** `boolean` · **Deprecated**
+
+An alias of `skipJotaiProvider`, kept so code written for react-recoil-form keeps working. Prefer `skipJotaiProvider`.
+
+### `skipValuesObserver`
+
+**Type:** `boolean` · **Default:** `false`
+
+Turns off live tracking of the whole form's values. With it on, `useFormValues`, `useFormValuesAndExtraInfos` and `useIsDirty` stop updating. Everything else works as usual, including submit, validation, `getValues()` and `checkIsDirty()`.
+
+Only use it on very large forms that don't need those hooks. See [Performance](/docs/guides/performance).
+
+## Using a form outside its provider
+
+Sometimes a component that needs the form can't be inside its `FormProvider`, like an order summary in a sidebar that's rendered elsewhere in the tree. To make it work:
+
+1. Give the form a `formId`.
+2. Pass `skipJotaiProvider: true`, so the form uses a shared Jotai store.
+3. Make sure the outside component is in the same Jotai store, under the same Jotai `<Provider>`, or neither under one.
+4. Pass the same `formId` to the hooks in the outside component.
+
+```tsx
+import { Provider } from 'jotai';
+
+function CheckoutPage() {
+  return (
+    <Provider>
+      <FormProvider options={{ formId: 'checkout', skipJotaiProvider: true }}>
+        <CheckoutForm />
+      </FormProvider>
+      <OrderSummary />
+    </Provider>
+  );
+}
+
+// Not inside the FormProvider
+function OrderSummary() {
+  const values = useFormValues({ formId: 'checkout' });
+  const { setValue } = useFormContext({ formId: 'checkout' });
+  // ...
+}
+```
+
+These hooks accept `formId`: `useFormContext`, `useFieldWatch`, `useFieldArrayColumnWatch`, `useFormValues`, `useFormValuesAndExtraInfos`, `useInitialValues` and `useSetFormProps`. `useField`, `useFieldArray`, `useForm` and `useIsDirty` must always be inside the provider.
+
+See the [Outside the Provider example](/docs/examples/advanced/outside-the-provider).

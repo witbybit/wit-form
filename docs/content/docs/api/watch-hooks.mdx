@@ -1,0 +1,190 @@
+---
+title: 'Watch hooks'
+description: 'Watch hooks read form values and keep a component up to date as they change. Each one re-renders only the component that calls it, and only when the values it reads change. Call them in small components, close to where the value is shown. See the Watching Values guide.'
+---
+
+```ts
+import {
+  useFieldWatch,
+  useFieldArrayColumnWatch,
+  useFormValues,
+  useFormValuesAndExtraInfos,
+  useInitialValues,
+  useIsDirty,
+} from 'wit-form';
+```
+
+To read a value once, in an event handler, use `getValue` or `getValues` from [`useFormContext`](/docs/api/use-form-context) instead. That doesn't subscribe at all.
+
+## useFieldWatch
+
+```ts
+const { values, extraInfos } = useFieldWatch({ fieldNames, formId });
+```
+
+Watches specific fields. Re-renders when any of them changes.
+
+### Options
+
+#### `fieldNames`
+
+**Type:** `(string | { name: string; ancestors?: { name: string; rowId: number }[] })[]` · **Required**
+
+The fields to watch. Use a string for top-level fields, or `{ name, ancestors }` for a field inside a field array row.
+
+#### `formId`
+
+**Type:** `string` · **Default:** the surrounding form
+
+Only for watching a form from outside its provider. See [FormProvider](/docs/api/form-provider#using-a-form-outside-its-provider).
+
+### Returns
+
+#### `values`
+
+**Type:** `object`
+
+The watched values, nested like the form values:
+
+```ts
+useFieldWatch({ fieldNames: ['name', 'address.city'] }).values;
+// { name: 'Ada', address: { city: 'London' } }
+```
+
+Fields inside a row appear under their plain name: `{ qty: 3 }`. A field that isn't rendered shows its initial value.
+
+#### `extraInfos`
+
+**Type:** `object`
+
+The watched fields' extra infos, in the same shape as `values`.
+
+## useFieldArrayColumnWatch
+
+```ts
+const { values, extraInfos } = useFieldArrayColumnWatch({
+  fieldArrayName,
+  fieldNames,
+  ancestors,
+  formId,
+});
+```
+
+Watches one or more columns of a field array, across all rows. Ideal for totals and summaries. Re-renders when rows are added, removed or reordered, or when a value in a watched column changes.
+
+### Options
+
+#### `fieldArrayName`
+
+**Type:** `string` · **Required**
+
+The field array's `name`.
+
+#### `fieldNames`
+
+**Type:** `string[]` · **Default:** every field in the rows
+
+The columns to watch. Watching only what you need avoids re-renders when other columns change.
+
+#### `ancestors`
+
+**Type:** `{ name: string; rowId: number }[]` · **Default:** `[]`
+
+For a nested field array: the row it's inside, like `[{ name: 'sections', rowId }]`.
+
+#### `formId`
+
+**Type:** `string` · **Default:** the surrounding form
+
+Only for watching from outside the provider.
+
+### Returns
+
+#### `values`
+
+**Type:** `object[]`
+
+One object per row, in display order, with only the watched columns:
+
+```ts
+// [{ qty: 2, price: 10 }, { qty: 1, price: 4 }]
+const total = values.reduce((sum, row) => sum + row.qty * row.price, 0);
+```
+
+#### `extraInfos`
+
+**Type:** `object[]`
+
+The rows' extra infos, in the same shape.
+
+## useFormValues
+
+```ts
+const values = useFormValues({ formId });
+```
+
+Returns **all** form values and re-renders on **every** change anywhere in the form. Useful for debug panels, small previews and summaries. Avoid it in components that render a lot.
+
+| Option   | Type     | Default              | Description                                 |
+| -------- | -------- | -------------------- | ------------------------------------------- |
+| `formId` | `string` | the surrounding form | Only for reading from outside the provider. |
+
+Stops updating if the provider has `skipValuesObserver: true`.
+
+## useFormValuesAndExtraInfos
+
+```ts
+const { values, extraInfos } = useFormValuesAndExtraInfos({ formId });
+```
+
+Like `useFormValues`, but also returns every field's extra info. It has the same `formId` option and the same re-render behaviour.
+
+## useInitialValues
+
+```ts
+const initialValues = useInitialValues({ formId });
+```
+
+Returns the form's current initial values. These are what `initialValues` started as, or what `resetInitialValues` or the last successful submit set. Re-renders when they change.
+
+| Option   | Type     | Default              | Description                                 |
+| -------- | -------- | -------------------- | ------------------------------------------- |
+| `formId` | `string` | the surrounding form | Only for reading from outside the provider. |
+
+## useIsDirty
+
+```ts
+const isDirty = useIsDirty({ preCompareUpdateFormValues });
+```
+
+Returns `true` when the current values differ from the initial values, meaning the user has unsaved changes. It updates as the user types.
+
+```tsx
+function SaveButton() {
+  const isDirty = useIsDirty();
+  return <button disabled={!isDirty}>Save</button>;
+}
+```
+
+### Options
+
+#### `preCompareUpdateFormValues`
+
+**Type:** `(values: any) => any` · **Default:** none
+
+Adjusts a copy of the current values before they're compared with the initial values. Use it to ignore fields that shouldn't count as a change:
+
+```ts
+useIsDirty({
+  preCompareUpdateFormValues: (values) => ({
+    ...values,
+    draftSavedAt: undefined,
+  }),
+});
+```
+
+### Notes
+
+- `useIsDirty` must be inside the form's provider. It doesn't accept `formId`.
+- It re-renders on every change in the form, like `useFormValues`. Keep it in a small component, like the save button.
+- Stops updating with `skipValuesObserver: true`. In an event handler, use `checkIsDirty()` from `useFormContext` instead.

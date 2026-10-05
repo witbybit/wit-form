@@ -38,8 +38,8 @@
     "check-exports": "attw --pack . --profile esm-only && publint",
     "prepare": "husky",
     "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run check-exports",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "docs:dev": "pnpm --filter wit-form-docs dev",
+    "docs:build": "pnpm --filter wit-form-docs build"
   },
   "peerDependencies": {
     "jotai": ">=3.0.0",
@@ -51,9 +51,6 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@storybook/addon-docs": "^10.6.1",
-    "@storybook/addon-links": "^10.6.1",
-    "@storybook/react-vite": "^10.6.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
@@ -65,8 +62,6 @@
     "publint": "^0.3.24",
     "react": ">=18.0.0",
     "react-dom": "^19.3.0",
-    "remark-gfm": "^4.0.1",
-    "storybook": "^10.6.1",
     "tsdown": "^0.23.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",

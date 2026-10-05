@@ -1,0 +1,25 @@
+---
+title: 'Extra Info & Files'
+description: 'Each field can carry an extraInfo next to its value. Pick an assignee and upload an image, then compare the values and extra infos on the right.'
+---
+
+import ExtraInfoAndFiles from '@/examples/patterns/ExtraInfo';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <ExtraInfoAndFiles />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include cwd lang="tsx" meta='title="examples/patterns/ExtraInfo.tsx"'>
+      examples/patterns/ExtraInfo.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+Every field stores a value and an optional [extra info](/docs/core-concepts#4-each-field-has-a-value-and-an-extra-info). The value holds what the API needs and the extra info holds what the UI needs: a member's name and colour, or a `File` and its preview URL.
+
+`setFieldValue(value, extraInfo)` sets both. `onSubmit(values, extraInfos)` receives both, with `extraInfos` shaped like `values`.

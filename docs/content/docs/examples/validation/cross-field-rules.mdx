@@ -1,0 +1,31 @@
+---
+title: 'Cross-field Rules'
+description: "The new password can't match the current one, and the confirmation must match the new password. Change the new password after confirming it and the confirmation re-validates."
+---
+
+import CrossFieldRules from '@/examples/validation/CrossFieldValidation';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <CrossFieldRules />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/validation/CrossFieldValidation.tsx"'
+    >
+      examples/validation/CrossFieldValidation.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+Fields listed in [`depFields`](/docs/api/use-field#depfields) arrive in the validator's second argument as `other.values`, and the field re-validates whenever they change.
+
+- The confirmation re-validates when the new password changes.
+- `PasswordChecklist` uses [`useFieldWatch`](/docs/api/watch-hooks#usefieldwatch) to follow one field without re-rendering the form.
+- [`reinitializeOnSubmit`](/docs/api/use-form#reinitializeonsubmit) clears the form after a successful submit.

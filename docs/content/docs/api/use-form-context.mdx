@@ -1,0 +1,144 @@
+---
+title: 'useFormContext'
+description: 'useFormContext lets any component inside the form read and change it from code, even if the component isn''t a field. Use it for buttons like "Use my saved address", lookups that fill in other fields, or reading values in an event handler.'
+---
+
+```ts
+import { useFormContext } from 'wit-form';
+
+const form = useFormContext({ formId });
+```
+
+Calling `useFormContext` doesn't subscribe to any values, so it never makes your component re-render.
+
+```tsx
+function UseSavedAddress() {
+  const { setFieldValues } = useFormContext();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        setFieldValues([
+          { name: 'address.street', value: '1 Main St' },
+          { name: 'address.city', value: 'Springfield' },
+        ])
+      }
+    >
+      Use saved address
+    </button>
+  );
+}
+```
+
+See the [Imperative Updates example](/docs/examples/patterns/imperative-updates).
+
+## Options
+
+### `formId`
+
+**Type:** `string` · **Default:** the surrounding form
+
+Only for using a form from outside its provider. See [FormProvider](/docs/api/form-provider#using-a-form-outside-its-provider).
+
+## Returns
+
+Several functions take a **field key** that says which field you mean:
+
+```ts
+// A top-level field: a string, or an object
+'email'
+{ name: 'email', type: 'field' }
+
+// A field inside a field array row
+{ name: 'qty', type: 'field', ancestors: [{ name: 'items', rowId }] }
+
+// A whole field array
+{ name: 'items', type: 'field-array' }
+```
+
+### `setValue`
+
+**Type:** `(key: string | IFormContextFieldInput, update: { value?: any; extraInfo?: any }) => void`
+
+Sets one field's value and/or extra info. Anything you leave out of `update` stays as it is. If the field is rendered, it re-validates.
+
+```ts
+setValue('email', { value: 'ada@example.com' });
+setValue('country', { value: 'FR', extraInfo: { label: 'France' } });
+setValue(
+  { name: 'qty', type: 'field', ancestors: [{ name: 'items', rowId }] },
+  { value: 3 }
+);
+```
+
+With a field array key, `value` is the new list of rows. It replaces the whole list:
+
+```ts
+setValue(
+  { name: 'items', type: 'field-array' },
+  { value: [{ product: 'Ink' }] }
+);
+```
+
+- `undefined` means "leave unchanged", so you can't set a value to `undefined`. Use `''` or `null` to clear a field.
+- Setting a field that isn't rendered stores the value. It's included in the submitted values and is used when the field mounts.
+- Setting a value doesn't mark the field as touched, so a new error only appears after a blur or submit.
+
+### `setFieldValues`
+
+**Type:** `(fields: { name: string; value: any; extraInfo?: any; ancestors?: Ancestor[] }[]) => void`
+
+Sets several fields in one call. Each entry works like `setValue`. It's for plain fields only. To replace a field array, use `setValue` with a field array key.
+
+### `getValue`
+
+**Type:** `(key: IFormContextFieldInput) => { value: any; extraInfo: any } | null`
+
+Reads one field, or one field array, right now. Unlike the watch hooks, it doesn't subscribe or cause re-renders, so it's the right choice in event handlers.
+
+```ts
+const email = getValue({ name: 'email', type: 'field' })?.value;
+const rows = getValue({ name: 'items', type: 'field-array' })?.value;
+```
+
+For a top-level field that hasn't mounted yet, it returns the field's initial value.
+
+### `getValues`
+
+**Type:** `() => { values: any; extraInfos: any }`
+
+Reads all values and extra infos right now, without subscribing.
+
+### `getValuesAndExtraInfo`
+
+**Type:** `() => { values: any; extraInfos: any }`
+
+The same as `getValues`.
+
+### `checkIsDirty`
+
+**Type:** `(options?: { preCompareUpdateFormValues?: (values) => any }) => boolean`
+
+Returns whether the values differ from the initial values, right now. The event-handler version of [`useIsDirty`](/docs/api/watch-hooks#useisdirty), with the same option.
+
+```ts
+if (checkIsDirty() && !confirm('Discard your changes?')) return;
+```
+
+### `removeFields`
+
+**Type:** `(params: { fieldNames: (string | { name: string; ancestors?: Ancestor[] })[] }) => void`
+
+Resets the given fields, discarding their current values. Each field goes back to its **initial value**, or becomes empty if it has none. After a successful submit, the initial values are the submitted ones. To empty a field no matter what, use `setValue(name, { value: '' })`.
+
+### `resetInitialValues`
+
+**Type:** `(values?: any, extraInfos?: any) => void`
+
+Replaces the initial values and resets every field to them. Same as [`useForm`'s `resetInitialValues`](/docs/api/use-form#resetinitialvalues).
+
+### `validateAllFields`
+
+**Type:** `() => IFieldError[]`
+
+Validates every mounted field and field array and returns the errors. Same as [`useForm`'s `validateAllFields`](/docs/api/use-form#validateallfields).

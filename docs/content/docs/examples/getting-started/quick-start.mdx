@@ -1,0 +1,31 @@
+---
+title: 'Quick Start'
+description: 'Fill in the form and submit. Leave a required field empty to see its error after you blur it or submit.'
+---
+
+import QuickStart from '@/examples/getting-started/QuickStart';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <QuickStart />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/getting-started/QuickStart.tsx"'
+    >
+      examples/getting-started/QuickStart.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+The smallest complete form: a field component built with [`useField`](/docs/api/use-field), a form built with [`useForm`](/docs/api/use-form), and a [`FormProvider`](/docs/api/form-provider) around both.
+
+- Field names are paths, so `address.city` creates `{ address: { city } }`.
+- `onSubmit` returns a promise, so `formState.isSubmitting` stays `true` until it settles.
+- `error` is only set once a field is touched: after it's blurred or the form is submitted.
