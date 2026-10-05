@@ -1,0 +1,95 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Documentation/Guides/Watching Values" />
+
+# Watching values
+
+Forms often need to show something based on what the user has entered: a live preview, a running total, a field that appears only for some answers. Wit Form has hooks that read values **without re-rendering the whole form**.
+
+## The rule of thumb
+
+**Put each hook in the smallest component that needs the value.** A watch hook re-renders the component that calls it, and only when the watched values change. If you call it in your top-level form component, the whole form re-renders on every change, which is the cost Wit Form is designed to avoid.
+
+```tsx
+// ✅ Only <ShippingCost> re-renders when the country changes
+function ShippingCost() {
+  const { values } = useFieldWatch({ fieldNames: ['country'] });
+  return <p>Shipping: {values.country === 'US' ? '$5' : '$15'}</p>;
+}
+```
+
+## Which hook to use
+
+| You want                               | Use                                                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| One or a few specific fields           | [`useFieldWatch`](?path=/docs/documentation-api-watch-hooks--docs#usefieldwatch)                           |
+| A column of a field array (for totals) | [`useFieldArrayColumnWatch`](?path=/docs/documentation-api-watch-hooks--docs#usefieldarraycolumnwatch)     |
+| Every value in the form                | [`useFormValues`](?path=/docs/documentation-api-watch-hooks--docs#useformvalues)                           |
+| Every value and extra info             | [`useFormValuesAndExtraInfos`](?path=/docs/documentation-api-watch-hooks--docs#useformvaluesandextrainfos) |
+| Whether anything changed               | [`useIsDirty`](?path=/docs/documentation-api-watch-hooks--docs#useisdirty)                                 |
+| The initial values                     | [`useInitialValues`](?path=/docs/documentation-api-watch-hooks--docs#useinitialvalues)                     |
+| A value right now, in an event handler | `getValue` or `getValues` from [`useFormContext`](?path=/docs/documentation-api-useformcontext--docs)      |
+
+The last row matters. If you only need a value when a button is clicked, don't watch it. Read it in the click handler with `useFormContext().getValue(...)`, and nothing re-renders.
+
+## Showing fields conditionally
+
+Watch the answer that controls the follow-up questions and render them only when needed:
+
+```tsx
+function CompanyDetails() {
+  const { values } = useFieldWatch({ fieldNames: ['isBusiness'] });
+  if (!values.isBusiness) return null;
+  return (
+    <>
+      <TextField name="company.name" label="Company name" />
+      <TextField name="company.vatNumber" label="VAT number" />
+    </>
+  );
+}
+```
+
+When the checkbox is cleared, the company fields unmount and their values are dropped from the form. See [Core Concepts](?path=/docs/documentation-core-concepts--docs#6-fields-come-and-go) and the [Conditional Fields example](?path=/story/examples-watching-values-conditional-fields--conditional-fields).
+
+## Live previews and counters
+
+```tsx
+function BioCounter() {
+  const { values } = useFieldWatch({ fieldNames: ['bio'] });
+  return <small>{values.bio?.length ?? 0}/160</small>;
+}
+```
+
+The [Live Preview example](?path=/story/examples-watching-values-live-preview--live-preview) shows render counters proving the form itself never re-renders as you type.
+
+## The shape of watched values
+
+`useFieldWatch` returns values **nested like the form values**, built from the field names:
+
+```tsx
+const { values } = useFieldWatch({ fieldNames: ['name', 'address.city'] });
+// values = { name: 'Ada', address: { city: 'London' } }
+```
+
+For fields inside a field array row, the value is under the field's plain name:
+
+```tsx
+const { values } = useFieldWatch({
+  fieldNames: [{ name: 'qty', ancestors: [{ name: 'items', rowId }] }],
+});
+// values = { qty: 3 }
+```
+
+`useFieldArrayColumnWatch` returns an **array of row objects** with only the columns you asked for:
+
+```tsx
+const { values } = useFieldArrayColumnWatch({
+  fieldArrayName: 'items',
+  fieldNames: ['qty', 'price'],
+});
+// values = [{ qty: 2, price: 10 }, { qty: 1, price: 4 }]
+```
+
+## Watching from outside the form
+
+Watch hooks normally find their form through the nearest `FormProvider`. To read a form from a component outside it, like a sidebar summary, see [Using a form outside its provider](?path=/docs/documentation-api-formprovider--docs#using-a-form-outside-its-provider).

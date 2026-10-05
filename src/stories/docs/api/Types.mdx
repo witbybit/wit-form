@@ -1,0 +1,108 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Documentation/API/Types" />
+
+# Types
+
+Wit Form ships TypeScript types. These are the ones you're most likely to use in your own code:
+
+```ts
+import type {
+  IAncestorInput,
+  IFieldError,
+  IFormContextFieldInput,
+  IChildFieldInfo,
+  IFieldProps,
+  IFieldArrayProps,
+  IFormProps,
+  IFieldWatchParams,
+  IFieldArrayColWatchParams,
+  IIsDirtyProps,
+  IRemoveFieldParams,
+} from 'wit-form';
+```
+
+## `IAncestorInput`
+
+One row that a field or nested field array belongs to. An `ancestors` list is an array of these, outermost row first.
+
+```ts
+interface IAncestorInput {
+  name: string; // the field array's name, like 'items'
+  rowId: number; // the row's id, from fieldArrayProps.rowIds
+}
+```
+
+Useful for typing props of row components:
+
+```tsx
+function RowAmount(props: { ancestors: IAncestorInput[] }) {
+  // ...
+}
+```
+
+## `IFieldError`
+
+One validation error, as returned by `validateFields`, `validateAllFields`, `validateData` and passed to `onError`.
+
+```ts
+interface IFieldError {
+  name: string; // the field or field array name
+  ancestors: { name: string; rowId: number }[]; // empty for top-level fields
+  type: 'field' | 'field-array';
+  error: string; // the message
+}
+```
+
+## `IFormContextFieldInput`
+
+A field key for `setValue`, `getValue` and `validateFields`.
+
+```ts
+interface IFormContextFieldInput {
+  name: string;
+  type: 'field' | 'field-array';
+  ancestors?: IAncestorInput[];
+}
+```
+
+## `IChildFieldInfo`
+
+One entry in `useFieldArray`'s `fieldNames`.
+
+```ts
+type IChildFieldInfo =
+  | string
+  | { name: string; type: 'field' }
+  | { name: string; type: 'field-array'; fieldNames: IChildFieldInfo[] };
+```
+
+## Option types
+
+The options objects of the hooks, if you want to wrap them in your own hooks or components:
+
+| Type                        | Options of                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `IFormProps`                | [`useForm`](?path=/docs/documentation-api-useform--docs)                                               |
+| `IFieldProps<Value>`        | [`useField`](?path=/docs/documentation-api-usefield--docs)                                             |
+| `IFieldArrayProps`          | [`useFieldArray`](?path=/docs/documentation-api-usefieldarray--docs)                                   |
+| `IFieldWatchParams`         | [`useFieldWatch`](?path=/docs/documentation-api-watch-hooks--docs#usefieldwatch)                       |
+| `IFieldArrayColWatchParams` | [`useFieldArrayColumnWatch`](?path=/docs/documentation-api-watch-hooks--docs#usefieldarraycolumnwatch) |
+| `IIsDirtyProps`             | [`useIsDirty`](?path=/docs/documentation-api-watch-hooks--docs#useisdirty) and `checkIsDirty`          |
+| `IRemoveFieldParams`        | `removeFields` from [`useFormContext`](?path=/docs/documentation-api-useformcontext--docs)             |
+
+For example, a reusable text field can take every `useField` option:
+
+```tsx
+import { useField, type IFieldProps } from 'wit-form';
+
+function TextField(props: IFieldProps<string> & { label: string }) {
+  const { label, ...fieldOptions } = props;
+  const { fieldValue, setFieldValue, onBlur, error } = useField(fieldOptions);
+  // ...
+}
+```
+
+## Internal types
+
+The package also exports types used inside the library, such as `IAtomValueBase`, `IFieldAtomValue`, `IFieldArrayAtomValue`, `InitialValues` and `FinalValues`. They describe internal state and may change between versions, so avoid depending on them.

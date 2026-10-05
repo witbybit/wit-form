@@ -1,0 +1,196 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Documentation/API/useForm" />
+
+# useForm
+
+```ts
+import { useForm } from 'wit-form';
+
+const form = useForm(options);
+```
+
+`useForm` controls the form as a whole: what happens on submit, the initial values, form-level validation, and resetting. Call it once per form, in a component inside the [FormProvider](?path=/docs/documentation-api-formprovider--docs).
+
+```tsx
+function SignupForm() {
+  const { handleSubmit, formState } = useForm({
+    initialValues: { plan: 'free' },
+    onSubmit: async (values) => {
+      await api.signUp(values);
+    },
+    onError: (fieldErrors) => console.warn(fieldErrors),
+  });
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* fields */}
+      <button disabled={formState.isSubmitting}>Sign up</button>
+    </form>
+  );
+}
+```
+
+## Options
+
+### `onSubmit`
+
+**Type:** `(values: any, extraInfos?: any) => any` · **Required**
+
+Called by `handleSubmit` when every validation passes.
+
+- `values`: the form values, shaped by the field names.
+- `extraInfos`: the fields' extra infos, in the same shape. See [Core Concepts](?path=/docs/documentation-core-concepts--docs#4-each-field-has-a-value-and-an-extra-info).
+
+If it returns a promise:
+
+- `formState.isSubmitting` is `true` until the promise settles.
+- When it resolves, the submitted values become the new initial values, so the form isn't dirty any more.
+- If it **resolves to `false`**, the initial values are left unchanged. Use this when a save fails and you want to keep the user's edits.
+- If it **rejects**, `isSubmitting` goes back to `false` and the error is ignored. Catch errors yourself to show them.
+
+```tsx
+onSubmit: async (values) => {
+  try {
+    await api.save(values);
+  } catch {
+    setError('Could not save');
+    return false;
+  }
+};
+```
+
+If it doesn't return a promise, the submitted values become the new initial values right away.
+
+### `onError`
+
+**Type:** `(fieldErrors, formErrors, values) => any` · **Default:** none
+
+Called **instead of** `onSubmit` when validation fails on submit.
+
+| Argument      | Type                            | Description                                            |
+| ------------- | ------------------------------- | ------------------------------------------------------ |
+| `fieldErrors` | `IFieldError[]`                 | One entry per failing field or field array. See below. |
+| `formErrors`  | `string[] \| null \| undefined` | What the form-level `validate` returned.               |
+| `values`      | `any`                           | The values that failed validation.                     |
+
+Each `IFieldError` looks like:
+
+```ts
+{ name: 'email', ancestors: [], type: 'field', error: 'Required' }
+```
+
+### `initialValues`
+
+**Type:** `object` · **Default:** `{}`
+
+The values the form starts with, in the same shape as the submitted values. Each field reads its starting value from here using its name.
+
+Read **once**, when the form first mounts. To load values later, call `resetInitialValues`. See [Loading and Saving Data](?path=/docs/documentation-guides-loading-and-saving-data--docs).
+
+By default, initial values for fields you never render are still included in the submitted values. Use `skipUnusedInitialValues` to leave them out.
+
+### `validate`
+
+**Type:** `(values: any) => string[] | null | undefined` · **Default:** none
+
+Form-level validation for rules that span several fields. Receives all values and returns a list of error messages. An empty list, `null` or `undefined` means valid.
+
+Runs **only on submit**, after field validation. The messages are passed to `onError` as `formErrors`. Show them yourself, for example in a banner.
+
+```tsx
+validate: (values) =>
+  values.endDate < values.startDate ? ['End date is before start date'] : [];
+```
+
+A child component can replace this function with [useSetFormProps](?path=/docs/documentation-api-usesetformprops--docs).
+
+### `skipUnregister`
+
+**Type:** `boolean` · **Default:** `false`
+
+Normally, when a field unmounts, its edits are discarded. With `skipUnregister: true`, **every** field and field array in the form keeps its value when it unmounts. Use it for multi-step forms and tabs, where fields unmount but their values still matter.
+
+To keep only some fields, pass `skipUnregister` to those `useField` or `useFieldArray` calls instead.
+
+### `reinitializeOnSubmit`
+
+**Type:** `boolean` · **Default:** `false`
+
+After a successful submit, reset the form to the original `initialValues` (or empty) instead of keeping the submitted values. Good for forms that should clear after each use, like "change password" or "post a comment".
+
+### `skipUnusedInitialValues`
+
+**Type:** `boolean` · **Default:** `false`
+
+Leave initial values that don't belong to a rendered field out of the submitted values. Without it, `onSubmit` receives the initial values merged with what the fields hold.
+
+Use it when `initialValues` is a big record from your API and you only want to submit the fields the form shows.
+
+## Returns
+
+### `handleSubmit`
+
+**Type:** `(event?: FormEvent) => any`
+
+Validates the form and, if valid, calls `onSubmit`. Pass it to `<form onSubmit>`. It calls `preventDefault()` and `stopPropagation()` on the event, so the page doesn't reload. You can also call it without an event, for example from a button's `onClick`.
+
+Returns whatever `onSubmit` returned, so you can `await` it. Returns `undefined` if validation failed.
+
+### `formState`
+
+**Type:** `{ isSubmitting: boolean }`
+
+`isSubmitting` is `true` while an async `onSubmit` is running. Use it to disable the submit button or show a spinner.
+
+### `handleReset`
+
+**Type:** `() => void`
+
+Resets every field and field array to the current initial values. Errors and touched state are cleared. After a successful submit, the "current initial values" are the submitted values.
+
+### `resetInitialValues`
+
+**Type:** `(values?: any, extraInfos?: any) => void`
+
+Replaces the initial values and resets every field to them. Call it when data arrives after the form mounted, like after a fetch. Called with no arguments, it keeps the current initial values and resets all fields to them.
+
+```tsx
+useEffect(() => {
+  api.getUser(id).then((user) => resetInitialValues(user));
+}, [id]);
+```
+
+### `validateFields`
+
+**Type:** `(names: (string | IFormContextFieldInput)[]) => IFieldError[]`
+
+Validates only the given fields or field arrays and returns their errors. An empty array means they're all valid. Failing fields are marked as touched so their errors show.
+
+- A string is a top-level field name, or a top-level field array name.
+- For a field inside a row, pass `{ name, type: 'field', ancestors }`.
+
+The form-level `validate` doesn't run. Typical use: checking the current step of a wizard before moving on.
+
+```tsx
+const next = () => {
+  if (validateFields(['email', 'password']).length === 0) setStep(2);
+};
+```
+
+### `validateAllFields`
+
+**Type:** `() => IFieldError[]`
+
+Validates every mounted field and field array, without submitting, and returns the errors. Failing fields are marked as touched. The form-level `validate` doesn't run.
+
+### `getValues`
+
+**Type:** `() => { values: any; extraInfos: any }`
+
+Returns the current values and extra infos. It reads them once and doesn't subscribe, so calling it doesn't cause re-renders. To show values that update live, use the [watch hooks](?path=/docs/documentation-api-watch-hooks--docs).
+
+## Notes
+
+- When the component that called `useForm` unmounts, the form's fields are reset.
+- `useForm` itself doesn't re-render when field values change. It only re-renders when `formState` changes.

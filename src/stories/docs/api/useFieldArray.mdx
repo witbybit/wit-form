@@ -1,0 +1,159 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Documentation/API/useFieldArray" />
+
+# useFieldArray
+
+```ts
+import { useFieldArray } from 'wit-form';
+
+const array = useFieldArray(options);
+```
+
+`useFieldArray` manages a list of rows that share the same fields: line items, guests, table rows. It tracks which rows exist and in what order, and gives you functions to add, insert and remove them. The inputs inside each row are still regular [`useField`](?path=/docs/documentation-api-usefield--docs) fields.
+
+```tsx
+const { fieldArrayProps, append, remove } = useFieldArray({
+  name: 'items',
+  fieldNames: ['product', 'qty'],
+});
+
+return fieldArrayProps.rowIds.map((rowId, index) => (
+  <ItemRow key={rowId} rowId={rowId} onRemove={() => remove(index)} />
+));
+```
+
+Read the [Field Arrays guide](?path=/docs/documentation-guides-field-arrays--docs) for a complete walkthrough.
+
+## Options
+
+### `name`
+
+**Type:** `string` · **Required**
+
+Where the list lives in the form values. `items` gives `{ items: [...] }`. For a list inside another list's row, use the plain name, like `lessons`, together with `ancestors`.
+
+### `fieldNames`
+
+**Type:** `(string | { name: string; type: 'field' } | { name: string; type: 'field-array'; fieldNames: [...] })[]` · **Required**
+
+The fields in each row. Wit Form uses this list to build each row's object in the submitted values, and to fill rows from initial values.
+
+```ts
+fieldNames: ['product', 'qty', 'price'];
+```
+
+Strings and `{ name, type: 'field' }` mean the same thing. The `type: 'field-array'` form declares a nested list, but has limitations in this version. See [Nested field arrays](?path=/docs/documentation-guides-field-arrays--docs#nested-field-arrays).
+
+### `ancestors`
+
+**Type:** `{ name: string; rowId: number }[]` · **Default:** `[]`
+
+Only for nested lists. The row (or rows) this list is inside, outermost first. Memoize it with `useMemo`.
+
+```ts
+// The lessons list inside one section row
+useFieldArray({
+  name: 'lessons',
+  fieldNames: ['title'],
+  ancestors: [{ name: 'sections', rowId: sectionRowId }],
+});
+```
+
+### `validate`
+
+**Type:** `(rows: any[]) => string | null | undefined` · **Default:** none
+
+Validates the list as a whole, like "Add at least one item". Receives every row as a plain object and returns an error message or `null`. It's checked whenever the rows change and on submit. The result is returned as `error`.
+
+Define it outside your component or memoize it. When `validate` is set, the component calling `useFieldArray` re-renders on **every** change inside the list, because the validator needs all values. Skip it on very large lists. See [Performance](?path=/docs/documentation-guides-performance--docs).
+
+### `defaultValue`
+
+**Type:** `object[]` · **Default:** none
+
+The rows to start with when `initialValues` has none for this list. Most useful for nested lists, where it gives each new parent row its first child rows.
+
+### `skipUnregister`
+
+**Type:** `boolean` · **Default:** `false`
+
+Keep the rows when this component unmounts. Without it, the rows are discarded on unmount.
+
+## Returns
+
+### `fieldArrayProps.rowIds`
+
+**Type:** `number[]`
+
+The id of each row, in display order. Render one row per id. Use the id as the React `key` and in each field's `ancestors`. Ids stay the same when other rows are added or removed. The index of an id in this array is the row's position.
+
+### `append`
+
+**Type:** `(...rows: object[]) => void`
+
+Adds rows at the end. With no arguments, adds one empty row. Fields you leave out use their `defaultValue`.
+
+```ts
+append(); // one empty row
+append({ product: 'Pen', qty: 1 }); // one row with values
+append(rowA, rowB); // two rows
+```
+
+### `insert`
+
+**Type:** `(index: number, ...rows: object[]) => void`
+
+Inserts rows at `index`, pushing later rows down. With no rows, inserts one empty row.
+
+```ts
+insert(0, { qty: 1 }); // at the top
+insert(index + 1, getFieldArrayValue()[index]); // duplicate a row
+```
+
+### `remove`
+
+**Type:** `(index: number) => void`
+
+Removes the row at `index`.
+
+### `clear`
+
+**Type:** `(index: number) => void`
+
+Resets the fields of the row at `index`, back to their `defaultValue` if they have one, without removing the row.
+
+### `removeAll`
+
+**Type:** `() => void`
+
+Removes every row.
+
+### `getFieldArrayValue`
+
+**Type:** `() => object[]`
+
+Returns the current rows as plain objects. It reads them once and doesn't subscribe, so use it in event handlers. To show rows live, use [`useFieldArrayColumnWatch`](?path=/docs/documentation-api-watch-hooks--docs#usefieldarraycolumnwatch).
+
+### `setFieldArrayValue`
+
+**Type:** `(rows: object[]) => void`
+
+Replaces all rows. Rows are reused where possible and extra ones are added or removed.
+
+### `validateData`
+
+**Type:** `() => { errors: IFieldError[]; isValid: boolean }`
+
+Validates the list and the fields in its rows right now, shows their errors, and returns the result.
+
+### `error`
+
+**Type:** `string | null | undefined`
+
+The error returned by `validate`. Unlike field errors, it doesn't wait for a touch: it shows as soon as it's set.
+
+## Notes
+
+- Fields inside rows use plain names (`qty`, not `items[0].qty`) plus `ancestors`.
+- Functions that take an `index` use the row's current position, the index in `rowIds`.

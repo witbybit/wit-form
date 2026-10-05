@@ -1,0 +1,222 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Documentation/Guides/Field Arrays" />
+
+# Field arrays
+
+A field array is a list of rows that all have the same fields: line items on an invoice, guests on a booking, rows in a spreadsheet. `useFieldArray` manages the list. `useField` still manages each input inside it.
+
+## Rows and row ids
+
+Every row gets a **row id**, a number that stays the same for the life of the row even when rows above it are added or removed. Use the row id in two places:
+
+1. As the React `key` when you render the rows.
+2. In `ancestors`, to tell each field which row it belongs to.
+
+Never use the row's index for either. Indexes shift when rows move, so inputs would show the wrong row's data.
+
+## A basic list
+
+```tsx
+import { useMemo } from 'react';
+import { useField, useFieldArray, useForm, withFormProvider } from 'wit-form';
+
+function ItemRow(props: { rowId: number; onRemove: () => void }) {
+  // Which row these fields belong to. Memoize it so it keeps its identity.
+  const ancestors = useMemo(
+    () => [{ name: 'items', rowId: props.rowId }],
+    [props.rowId]
+  );
+  const product = useField<string>({ name: 'product', ancestors });
+  const qty = useField<number>({ name: 'qty', ancestors, defaultValue: 1 });
+
+  return (
+    <div>
+      <input
+        value={product.fieldValue ?? ''}
+        onChange={(e) => product.setFieldValue(e.target.value)}
+      />
+      <input
+        type="number"
+        value={qty.fieldValue ?? ''}
+        onChange={(e) => qty.setFieldValue(e.target.valueAsNumber)}
+      />
+      <button type="button" onClick={props.onRemove}>
+        Remove
+      </button>
+    </div>
+  );
+}
+
+function OrderForm() {
+  const { handleSubmit } = useForm({
+    initialValues: { items: [{ product: 'Pen', qty: 2 }] },
+    onSubmit: (values) => console.log(values.items),
+  });
+
+  const { fieldArrayProps, append, remove } = useFieldArray({
+    name: 'items',
+    fieldNames: ['product', 'qty'],
+  });
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {fieldArrayProps.rowIds.map((rowId, index) => (
+        <ItemRow key={rowId} rowId={rowId} onRemove={() => remove(index)} />
+      ))}
+      <button type="button" onClick={() => append()}>
+        Add item
+      </button>
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+
+export default withFormProvider(OrderForm);
+```
+
+On submit, `values.items` is an array of row objects, in display order:
+
+```js
+[
+  { product: 'Pen', qty: 2 },
+  { product: 'Ink', qty: 1 },
+];
+```
+
+### Things to know
+
+- **`fieldNames`** lists the fields in each row. Wit Form uses it to build the row objects in the submitted values, and to fill rows from initial values.
+- **Field names inside a row are plain.** The field is named `qty`, not `items.qty` or `items[0].qty`. The `ancestors` say which row it's in.
+- **`defaultValue` on a row's field** fills that field in new rows. Above, `append()` adds a row whose quantity starts at `1`.
+- **Memoize `ancestors`.** Pass the same array object between renders, as `useMemo` does above, so hooks don't redo work.
+
+## Changing rows
+
+`useFieldArray` returns functions for every common change. Most take a row **index** (the position in the list), not a row id:
+
+| Call                       | What it does                                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------------------- |
+| `append()`                 | Adds one empty row at the end.                                                                |
+| `append(row1, row2)`       | Adds rows with these values at the end.                                                       |
+| `insert(index, row)`       | Adds a row at `index`, pushing later rows down.                                               |
+| `remove(index)`            | Removes the row at `index`.                                                                   |
+| `clear(index)`             | Resets the fields of the row at `index` (to their `defaultValue`, if any), but keeps the row. |
+| `removeAll()`              | Removes every row.                                                                            |
+| `setFieldArrayValue(rows)` | Replaces all rows with new ones.                                                              |
+| `getFieldArrayValue()`     | Returns the current rows, without re-rendering.                                               |
+
+Duplicating a row combines two of them:
+
+```tsx
+insert(index + 1, getFieldArrayValue()[index]);
+```
+
+## Validating the list
+
+Pass a `validate` function to check the rows as a whole. It receives every row and returns a message or `null`:
+
+```tsx
+const validateItems = (rows: unknown[]) =>
+  rows.length === 0 ? 'Add at least one item' : null;
+
+const { error } = useFieldArray({
+  name: 'items',
+  fieldNames: ['product', 'qty'],
+  validate: validateItems,
+});
+```
+
+Define it outside the component, or memoize it. See [Validation](?path=/docs/documentation-guides-validation--docs#field-array-validation) for details, including a performance note.
+
+## Totals and other calculated values
+
+To show a total, watch the columns you need with `useFieldArrayColumnWatch`. Put it in its own small component, so only that component re-renders as values change:
+
+```tsx
+function OrderTotal() {
+  const { values: rows } = useFieldArrayColumnWatch({
+    fieldArrayName: 'items',
+    fieldNames: ['qty', 'price'],
+  });
+  const total = rows.reduce((sum, row) => sum + row.qty * row.price, 0);
+  return <strong>{total}</strong>;
+}
+```
+
+To show something for one row, like that row's amount, watch just that row's fields:
+
+```tsx
+function RowAmount(props: { ancestors: { name: string; rowId: number }[] }) {
+  const { values } = useFieldWatch({
+    fieldNames: [
+      { name: 'qty', ancestors: props.ancestors },
+      { name: 'price', ancestors: props.ancestors },
+    ],
+  });
+  return <span>{(values.qty ?? 0) * (values.price ?? 0)}</span>;
+}
+```
+
+The [Invoice example](?path=/story/examples-field-arrays-invoice--invoice) puts all of this together.
+
+## Nested field arrays
+
+A row can contain its own list, like sections that each contain lessons. Each section row renders its own `useFieldArray` for the lessons, with the section row as its `ancestors`:
+
+```tsx
+// The outer list
+useFieldArray({ name: 'sections', fieldNames: ['title'] });
+
+// Rendered inside each section row
+function Lessons(props: { sectionRowId: number }) {
+  const sectionAncestors = useMemo(
+    () => [{ name: 'sections', rowId: props.sectionRowId }],
+    [props.sectionRowId]
+  );
+  const { fieldArrayProps } = useFieldArray({
+    name: 'lessons',
+    fieldNames: ['title', 'minutes'],
+    ancestors: sectionAncestors,
+    // Rows for a new section, which has no initial lessons
+    defaultValue: [{ minutes: 10 }],
+  });
+  return fieldArrayProps.rowIds.map((rowId) => (
+    <Lesson key={rowId} sectionAncestors={sectionAncestors} rowId={rowId} />
+  ));
+}
+
+// A field in a lesson lists every row it's inside, outermost first
+function Lesson(props: { sectionAncestors: Ancestor[]; rowId: number }) {
+  const ancestors = useMemo(
+    () => [...props.sectionAncestors, { name: 'lessons', rowId: props.rowId }],
+    [props.sectionAncestors, props.rowId]
+  );
+  const title = useField<string>({ name: 'title', ancestors });
+  // ...
+}
+```
+
+Initial values, resets and submitted values all include the nested lists:
+
+```js
+{
+  sections: [
+    { title: 'Getting started', lessons: [{ title: 'Intro', minutes: 6 }] },
+  ],
+}
+```
+
+### Current limitations
+
+Nested lists have a few rough edges in this version:
+
+- `append({ title: 'New section', lessons: [...] })` adds the section but not its lessons. Add an empty section and let the inner array's `defaultValue` provide the first rows, as above.
+- Replacing the outer list with `setFieldArrayValue` or `setValue` doesn't fill in the nested lists. To load new nested data, use `resetInitialValues` instead (see [Loading and Saving Data](?path=/docs/documentation-guides-loading-and-saving-data--docs)).
+- The `fieldNames` option accepts `{ name, type: 'field-array', fieldNames }` entries for nested lists. Leave them out for now: with them, initial values don't reach the nested rows.
+
+See it running in the [Nested Arrays example](?path=/story/examples-field-arrays-nested-arrays--nested-arrays).
+
+## Keeping rows when the list unmounts
+
+Like fields, a field array's rows are discarded when its component unmounts. Pass `skipUnregister: true` to `useFieldArray`, or to `useForm` for the whole form, to keep them. That's useful when the list lives on one tab of a tabbed form.

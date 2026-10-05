@@ -16,6 +16,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": { "wit-form": ["./src/index.ts"] }
   }
 }
