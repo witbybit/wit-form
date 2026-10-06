@@ -18,11 +18,10 @@ export function Footer() {
     <footer className="border-t py-10">
       <Container className="flex flex-col items-center justify-between gap-6 text-sm text-fd-muted-foreground sm:flex-row">
         <p>
-          <span className="font-medium text-fd-foreground">{appName}</span> ·
-          MIT licensed ·{' '}
+          <span className="font-medium text-fd-foreground">{appName}</span> ·{' '}
           <a
             href="https://witbybit.com/"
-            className="font-medium text-fd-foreground hover:underline"
+            className="font-medium hover:text-fd-foreground hover:underline"
           >
             Built by Wit By Bit
           </a>
