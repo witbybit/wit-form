@@ -1,0 +1,45 @@
+---
+title: 'useSetFormProps'
+description: 'useSetFormProps lets a component inside the form replace the form-level validate function that was passed to useForm. Use it when the rules depend on something only a child component knows about, like which tab or section is shown.'
+---
+
+```ts
+import { useSetFormProps } from 'wit-form';
+
+const setFormProps = useSetFormProps({ formId });
+```
+
+```tsx
+function ShippingSection() {
+  const setFormProps = useSetFormProps();
+
+  useEffect(() => {
+    setFormProps({
+      validate: (values) =>
+        !values.shipping?.address ? ['Add a shipping address'] : [],
+    });
+    // Go back to the validate passed to useForm when this section unmounts
+    return () => setFormProps({ validate: null });
+  }, [setFormProps]);
+
+  return <AddressFields prefix="shipping" />;
+}
+```
+
+## Options
+
+### `formId`
+
+**Type:** `string` · **Default:** the surrounding form
+
+Only for using a form from outside its provider. See [FormProvider](/docs/api/form-provider#using-a-form-outside-its-provider).
+
+## Returns
+
+### `setFormProps`
+
+**Type:** `(props: { validate: ((values: any) => string[] | null | undefined) | null }) => void`
+
+Sets the form-level validator. It has the same shape as [`useForm`'s `validate`](/docs/api/use-form#validate) and runs on submit, **instead of** the one passed to `useForm`.
+
+Pass `{ validate: null }` to go back to the validator from `useForm`.

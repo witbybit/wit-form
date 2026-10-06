@@ -549,7 +549,7 @@ pnpm install
 pnpm test          # run tests
 pnpm run typecheck # type check
 pnpm run build     # build to dist/
-pnpm storybook     # run the examples in src/stories
+pnpm docs:dev      # run the docs site, with live examples, from docs/
 ```
 
 `pnpm-workspace.yaml` turns on pnpm's supply-chain protections: new package versions are only installed once they are 3 days old, installs fail if a package's publish trust gets weaker, and dependency install scripts are blocked unless allowed.

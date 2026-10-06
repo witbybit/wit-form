@@ -1,0 +1,12 @@
+{
+  "title": "Examples",
+  "pages": [
+    "index",
+    "getting-started",
+    "validation",
+    "field-arrays",
+    "watching-values",
+    "patterns",
+    "advanced"
+  ]
+}

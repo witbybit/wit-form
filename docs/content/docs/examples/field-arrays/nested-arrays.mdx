@@ -1,0 +1,31 @@
+---
+title: 'Nested Arrays'
+description: 'A field array inside a field array. Each section has its own list of lessons and its own running duration.'
+---
+
+import NestedArrays from '@/examples/field-arrays/NestedFieldArrays';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <NestedArrays />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/field-arrays/NestedFieldArrays.tsx"'
+    >
+      examples/field-arrays/NestedFieldArrays.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+A field array inside a field array. Each section row renders its own `useFieldArray` for its lessons, with the section row as its `ancestors`. See [Nested field arrays](/docs/guides/field-arrays#nested-field-arrays).
+
+- Fields in a lesson list every row they're inside, outermost first.
+- Initial values and submitted values include the nested lessons.
+- The inner array's `defaultValue` gives a new section its first lesson.

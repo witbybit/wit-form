@@ -1,0 +1,29 @@
+---
+title: 'Live Preview'
+description: 'The preview and the character counter watch only the fields they show. The yellow badges count renders: the form itself never re-renders as you type.'
+---
+
+import LivePreview from '@/examples/watching-values/LivePreview';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <LivePreview />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/watching-values/LivePreview.tsx"'
+    >
+      examples/watching-values/LivePreview.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+A preview card and a character counter built from watched values. See [Watching Values](/docs/guides/watching-values).
+
+The yellow badges count renders. Typing re-renders the field you're typing in and the components watching it. The form component itself doesn't re-render.

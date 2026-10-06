@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Static-assets-only Worker serving the Next.js export in out/
+  "name": "wit-form-docs",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./out",
+    // Serve out/404.html with a 404 status for unknown paths
+    "not_found_handling": "404-page",
+  },
+}

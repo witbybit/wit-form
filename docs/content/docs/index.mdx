@@ -1,0 +1,34 @@
+---
+title: 'Introduction'
+description: 'Fast React forms where every field is a Jotai atom.'
+---
+
+Each field keeps its state in its own atom, so typing in one field re-renders only that field, not the whole form. Large forms, long tables and dynamic field arrays stay fast without any memoization on your side.
+
+- **Field-level state:** `useField` subscribes a component to a single field.
+- **Field arrays:** add, insert and remove rows, including nested arrays. Only the cells that change re-render.
+- **Validation:** per field, per field array and form-wide, as values change and on submit.
+- **Live values without re-renders:** watch specific fields, a column of a field array, or the whole form from any component.
+- **Dirty tracking, initial values, resets and async submit** built in.
+- **TypeScript** types included, ESM-only, about 7 kB gzipped.
+
+```sh
+pnpm add wit-form jotai
+```
+
+## Explore
+
+<Cards>
+  <Card title="Getting Started" href="/docs/getting-started">
+    Build your first form in five minutes.
+  </Card>
+  <Card title="Core Concepts" href="/docs/core-concepts">
+    The six ideas behind the library.
+  </Card>
+  <Card title="API Reference" href="/docs/api/use-form">
+    Every hook, option and return value.
+  </Card>
+  <Card title="Examples" href="/docs/examples">
+    Complete, working forms with their full source.
+  </Card>
+</Cards>

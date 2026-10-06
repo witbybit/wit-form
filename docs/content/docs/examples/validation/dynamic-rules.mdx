@@ -1,0 +1,25 @@
+---
+title: 'Dynamic Rules'
+description: 'The amount starts above your balance, so submitting fails. Add funds and submit again: the same amount is now checked against the new balance.'
+---
+
+import DynamicRules from '@/examples/validation/DynamicRules';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <DynamicRules />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include cwd lang="tsx" meta='title="examples/validation/DynamicRules.tsx"'>
+      examples/validation/DynamicRules.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+When a rule depends on props or React state from outside the form, pass a memoized [`validateCallback`](/docs/api/use-field#validatecallback) instead of `validate`.
+
+The latest callback is used the next time the field validates: when its value changes, or on submit.

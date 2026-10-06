@@ -1,0 +1,31 @@
+---
+title: 'Imperative Updates'
+description: 'Fill fields from code: load a saved address, look up a city from a ZIP code, copy one address into another, or clear one.'
+---
+
+import ImperativeUpdates from '@/examples/patterns/ImperativeUpdates';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <ImperativeUpdates />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/patterns/ImperativeUpdates.tsx"'
+    >
+      examples/patterns/ImperativeUpdates.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+[`useFormContext()`](/docs/api/use-form-context) lets any component inside the form read and write it.
+
+- `setValue(name, { value })` sets one field and re-validates it, as in the ZIP code lookup.
+- `setFieldValues([...])` sets several fields at once, as in the saved address and the Clear button.
+- `getValue({ name, type: 'field' })` reads a field, as in Copy from billing.

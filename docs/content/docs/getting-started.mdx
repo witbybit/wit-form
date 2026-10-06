@@ -1,0 +1,139 @@
+---
+title: 'Getting started'
+description: 'This page takes you from installing Wit Form to a working form with validation and a submit handler. It takes about five minutes.'
+---
+
+## Install
+
+Wit Form uses [Jotai](https://jotai.org) to store form state, so install both:
+
+```sh
+pnpm add wit-form jotai
+# or
+npm install wit-form jotai
+# or
+yarn add wit-form jotai
+```
+
+You need React 18 or newer and Jotai 3 or newer. The package is ESM-only and ships its own TypeScript types.
+
+## The three pieces of every form
+
+Every form is made of the same three pieces:
+
+| Piece                     | What it does                                                                |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `FormProvider`            | A wrapper that holds the state of one form. Everything else goes inside it. |
+| `useForm`                 | A hook for the form as a whole: submitting, resetting, initial values.      |
+| `useField` (or `<Field>`) | A hook that connects one input to one value in the form.                    |
+
+Wit Form doesn't ship input components. You write your own small input components with `useField`, styled the way your app looks, and reuse them in every form.
+
+## Step 1: write a field component
+
+A field component reads its value with `useField` and writes it back when the input changes:
+
+```tsx
+import { useField } from 'wit-form';
+
+function TextField(props: { name: string; label: string; required?: boolean }) {
+  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
+    name: props.name,
+    validate: (value) => (props.required && !value ? 'Required' : null),
+  });
+
+  return (
+    <label>
+      {props.label}
+      <input
+        value={fieldValue ?? ''}
+        onChange={(e) => setFieldValue(e.target.value)}
+        onBlur={onBlur}
+      />
+      {error && <span className="error">{error}</span>}
+    </label>
+  );
+}
+```
+
+A few things to notice:
+
+- `name` says which value this input controls.
+- `fieldValue` is `undefined` until the field has a value, so `?? ''` keeps the input controlled.
+- `validate` returns an error message, or `null` when the value is fine.
+- `error` stays empty until the user leaves the field (`onBlur`) or submits the form. Errors don't appear while someone is still typing their first answer.
+
+## Step 2: build the form
+
+`useForm` gives you `handleSubmit`. Pass it to the `<form>` element:
+
+```tsx
+import { useForm } from 'wit-form';
+
+function SignupForm() {
+  const { handleSubmit, formState } = useForm({
+    initialValues: { name: 'Jane' },
+    onSubmit: async (values) => {
+      await fetch('/api/signup', {
+        method: 'POST',
+        body: JSON.stringify(values),
+      });
+    },
+  });
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <TextField name="name" label="Name" required />
+      <TextField name="email" label="Email" required />
+      <TextField name="address.city" label="City" />
+      <button type="submit" disabled={formState.isSubmitting}>
+        Sign up
+      </button>
+    </form>
+  );
+}
+```
+
+When the user submits, Wit Form validates every field. If everything is valid it calls `onSubmit` with the values:
+
+```js
+{ name: 'Jane', email: 'jane@example.com', address: { city: 'Paris' } }
+```
+
+The name `address.city` became a nested object. Field names are paths into the values. See [Core Concepts](/docs/core-concepts).
+
+Because `onSubmit` returns a promise, `formState.isSubmitting` stays `true` until the request finishes, so the button can't be pressed twice.
+
+## Step 3: wrap it in a FormProvider
+
+The component that calls `useForm` must be inside a `FormProvider`, like every other Wit Form hook:
+
+```tsx
+import { FormProvider } from 'wit-form';
+
+export default function App() {
+  return (
+    <FormProvider>
+      <SignupForm />
+    </FormProvider>
+  );
+}
+```
+
+`withFormProvider` does the same thing in one line:
+
+```tsx
+import { withFormProvider } from 'wit-form';
+
+export default withFormProvider(SignupForm);
+```
+
+That's a complete form. You can see it running in the [Quick Start example](/docs/examples/getting-started/quick-start).
+
+## Where to go next
+
+- [Core Concepts](/docs/core-concepts): how values, field names, errors and the provider fit together. Read this next.
+- [Validation](/docs/guides/validation): rules that span fields, depend on state, or cover the whole form.
+- [Field Arrays](/docs/guides/field-arrays): lists of rows, like order lines or a table.
+- [Loading and Saving Data](/docs/guides/loading-and-saving): editing existing records, unsaved changes, reset.
+- The **API** pages describe every hook and option in detail.

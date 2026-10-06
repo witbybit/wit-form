@@ -1,0 +1,135 @@
+---
+title: 'Loading and saving data'
+description: 'Most real forms edit something that already exists: a user profile, a settings page, an order. This guide covers starting values, loading data after a fetch, tracking unsaved changes, saving and resetting.'
+---
+
+## Starting values
+
+Pass `initialValues` to `useForm`. They have the same shape as the submitted values:
+
+```tsx
+useForm({
+  initialValues: {
+    name: 'Grace Hopper',
+    address: { city: 'Arlington' },
+    items: [{ product: 'Pen', qty: 2 }],
+  },
+  onSubmit,
+});
+```
+
+`initialValues` is read **once, when the form first mounts**. Changing it later has no effect. To load new values, use `resetInitialValues`, described next.
+
+A field with no initial value can use its own `defaultValue`:
+
+```tsx
+useField({ name: 'country', defaultValue: 'US' });
+```
+
+## Loading data after a fetch
+
+If the data arrives after the form mounts, call `resetInitialValues` once it's ready:
+
+```tsx
+function EditUser({ userId }: { userId: string }) {
+  const { handleSubmit, resetInitialValues } = useForm({ onSubmit: save });
+
+  useEffect(() => {
+    api.getUser(userId).then((user) => resetInitialValues(user));
+  }, [userId]);
+
+  // ...
+}
+```
+
+`resetInitialValues(values)` replaces the initial values and resets every field to them. Edits are discarded and errors and touched state are cleared. The form isn't dirty afterwards.
+
+You can also delay rendering the form until the data is loaded, and pass the data as `initialValues`. That's simpler when the record never changes while the form is open.
+
+## Tracking unsaved changes
+
+A form is **dirty** when its current values differ from its initial values. `useIsDirty` returns that as a boolean and updates as the user types:
+
+```tsx
+function SaveButton() {
+  const isDirty = useIsDirty();
+  return (
+    <button type="submit" disabled={!isDirty}>
+      Save changes
+    </button>
+  );
+}
+```
+
+Inside an event handler, use `checkIsDirty()` from `useFormContext` instead. For example, to confirm before leaving:
+
+```tsx
+const { checkIsDirty } = useFormContext();
+
+const switchUser = (id: string) => {
+  if (checkIsDirty() && !confirm('Discard your changes?')) return;
+  setUserId(id);
+};
+```
+
+Both accept `preCompareUpdateFormValues`, a function that adjusts the values before they're compared. Use it to ignore fields that shouldn't count as changes:
+
+```tsx
+useIsDirty({
+  preCompareUpdateFormValues: (values) => ({
+    ...values,
+    lastViewedAt: undefined,
+  }),
+});
+```
+
+## Saving
+
+`onSubmit` receives the values. Return the save promise so `formState.isSubmitting` stays `true` until it finishes:
+
+```tsx
+useForm({
+  onSubmit: async (values) => {
+    await api.saveUser(values);
+  },
+});
+```
+
+After a successful save, **the submitted values become the new initial values.** The form is no longer dirty, and `handleReset` returns to the saved values, not the original ones.
+
+### When saving fails
+
+If the save fails, you usually want to keep the user's edits and keep the form dirty. Catch the error and **resolve to `false`**. The initial values then stay as they were:
+
+```tsx
+useForm({
+  onSubmit: async (values) => {
+    try {
+      await api.saveUser(values);
+    } catch (err) {
+      setSaveError((err as Error).message);
+      return false; // keep the old initial values; the form stays dirty
+    }
+  },
+});
+```
+
+If `onSubmit` throws or rejects, Wit Form sets `isSubmitting` back to `false` and swallows the error, without telling you. Always catch errors inside `onSubmit` so you can show them.
+
+### Clearing the form after submit
+
+Some forms should empty after a successful submit, like a "change password" or "add comment" form. Pass `reinitializeOnSubmit: true` and the form goes back to its original `initialValues` (or empty) after each successful submit.
+
+## Resetting
+
+| Call                         | What happens                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| `handleReset()`              | Every field goes back to the current initial values. Errors and touched state are cleared. |
+| `resetInitialValues(values)` | The initial values are replaced, then every field is reset to them.                        |
+| `resetInitialValues()`       | Same as `handleReset`, and the form re-reads every field's initial value.                  |
+
+Both come from `useForm`. `resetInitialValues` is also on `useFormContext`.
+
+## A complete example
+
+The [Edit a Record example](/docs/examples/patterns/edit-a-record) loads a record after a delay, enables Save only when something changed, discards edits, and simulates a failed save that keeps the user's changes.

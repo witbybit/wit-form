@@ -1,0 +1,28 @@
+---
+title: 'Edit a Record'
+description: "Change something and the Save button turns on. Discard puts the loaded values back. Turn on \u201cFail the next save\u201d to see a failed save keep your edits."
+---
+
+import EditARecord from '@/examples/patterns/EditRecord';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <EditARecord />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include cwd lang="tsx" meta='title="examples/patterns/EditRecord.tsx"'>
+      examples/patterns/EditRecord.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+Load a record, edit it and save it. See [Loading and Saving Data](/docs/guides/loading-and-saving).
+
+- [`resetInitialValues(record)`](/docs/api/use-form#resetinitialvalues) loads fetched data as the new initial values.
+- [`useIsDirty()`](/docs/api/watch-hooks#useisdirty) enables Save only when something changed, and `handleReset()` discards the edits.
+- When the save fails, `onSubmit` resolves to `false`, so the initial values are kept and the edits stay.
+- `checkIsDirty()` asks before switching to another record.

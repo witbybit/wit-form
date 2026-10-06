@@ -1,0 +1,172 @@
+---
+title: 'useField'
+description: 'useField connects one input to one value in the form. It gives you the current value, a function to change it, the validation error and the touched state. The component that calls it re-renders only when this field changes.'
+---
+
+```ts
+import { useField } from 'wit-form';
+
+const field = useField<Value, ExtraInfo>(options);
+```
+
+You'll usually call `useField` inside your own reusable input components:
+
+```tsx
+function TextField(props: { name: string; label: string }) {
+  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
+    name: props.name,
+  });
+  return (
+    <label>
+      {props.label}
+      <input
+        value={fieldValue ?? ''}
+        onChange={(e) => setFieldValue(e.target.value)}
+        onBlur={onBlur}
+      />
+      {error && <span>{error}</span>}
+    </label>
+  );
+}
+```
+
+## Type parameters
+
+| Parameter   | Default | Description                                   |
+| ----------- | ------- | --------------------------------------------- |
+| `Value`     | `any`   | The type of the field's value, like `string`. |
+| `ExtraInfo` | `any`   | The type of the field's extra info.           |
+
+```ts
+useField<string, { label: string }>({ name: 'country' });
+```
+
+## Options
+
+### `name`
+
+**Type:** `string` · **Required**
+
+Where the value lives in the form values. Dots create nested objects: `address.city` becomes `{ address: { city } }`. Inside a field array row, use the plain field name, like `qty`, together with `ancestors`.
+
+### `ancestors`
+
+**Type:** `{ name: string; rowId: number }[]` · **Default:** `[]`
+
+Only for fields inside [field array](/docs/guides/field-arrays) rows. Lists the rows this field belongs to, **outermost first**:
+
+```ts
+// A field in a top-level array
+ancestors: [{ name: 'items', rowId }];
+
+// A field in a nested array (lessons inside sections)
+ancestors: [
+  { name: 'sections', rowId: sectionRowId },
+  { name: 'lessons', rowId: lessonRowId },
+];
+```
+
+Use the row id from `fieldArrayProps.rowIds`, never the index. Memoize the array with `useMemo` so it keeps its identity between renders.
+
+### `defaultValue`
+
+**Type:** `Value` · **Default:** `undefined`
+
+The value to use when `initialValues` has none for this field. In field arrays, it also fills this field in newly added rows. A value that is `null`, `''` or `0` counts as set and isn't replaced.
+
+### `validate`
+
+**Type:** `(value: Value | undefined, other?: { values: any; extraInfos: any }) => string | null | undefined` · **Default:** none
+
+Returns an error message, or `null`/`undefined` when the value is valid. Runs on every change, and for all fields on submit.
+
+- `value` is the field's current value.
+- `other.values` contains the fields listed in `depFields` while editing, and **all** form values during submit and `validateFields`.
+
+`validate` is read **once, when the field mounts**. Later versions of the function are ignored, so define it outside your component or memoize it. If the rule depends on changing props or state, use `validateCallback` instead.
+
+### `validateCallback`
+
+**Type:** same as `validate` · **Default:** none
+
+A validator that may change over time, for rules that depend on props or React state. Wrap it in `useCallback` and Wit Form always uses the latest version. A new callback takes effect the next time the field validates: when its value changes, or on submit.
+
+```tsx
+const validateCallback = useCallback(
+  (value?: number) => (value! > max ? `At most ${max}` : null),
+  [max]
+);
+useField({ name: 'quantity', validateCallback });
+```
+
+When both are given, `validateCallback` is used.
+
+### `depFields`
+
+**Type:** `(string | { name: string; ancestors?: { name: string; rowId: number }[] })[]` · **Default:** none
+
+Other fields this field's validation depends on. Their values are passed to the validator as `other.values`, and this field re-validates whenever one of them changes.
+
+```tsx
+useField({
+  name: 'confirmPassword',
+  depFields: ['password'],
+  validate: (value, other) =>
+    value !== other?.values.password ? 'Passwords do not match' : null,
+});
+```
+
+### `skipUnregister`
+
+**Type:** `boolean` · **Default:** `false`
+
+Keep this field's value when its component unmounts. Without it, edits are discarded on unmount and the field falls back to its initial value. To keep every field in the form, use `useForm({ skipUnregister: true })` instead.
+
+## Returns
+
+### `fieldValue`
+
+**Type:** `Value | undefined`
+
+The field's current value. It's `undefined` until the field has a value, so write `fieldValue ?? ''` for text inputs to keep them controlled.
+
+### `setFieldValue`
+
+**Type:** `(value: Value, extraInfo?: ExtraInfo) => void`
+
+Changes the field's value, which runs its validator. The second argument sets the field's [extra info](/docs/core-concepts#4-each-field-has-a-value-and-an-extra-info).
+
+Each call replaces **both** the value and the extra info. Calling `setFieldValue(value)` without an extra info clears any previous one.
+
+```tsx
+setFieldValue(option.value, { label: option.label });
+```
+
+### `extraInfo`
+
+**Type:** `ExtraInfo | undefined`
+
+The field's current extra info.
+
+### `error`
+
+**Type:** `string | null | undefined`
+
+The validation error, **only once the field is touched**. Before that it's `undefined`, even if the value is invalid. This keeps errors from appearing while the user is still filling in the field for the first time.
+
+### `touched`
+
+**Type:** `boolean | undefined`
+
+Whether the field has been touched: blurred, submitted, or validated with `validateFields`/`validateAllFields`.
+
+### `onBlur`
+
+**Type:** `() => void`
+
+Marks the field as touched. Pass it to your input's `onBlur`, or errors only appear after a submit.
+
+## Notes
+
+- `useField` must run inside the form's `FormProvider`.
+- Values are stored as you give them. Wit Form doesn't convert input strings to numbers. Do it in your component, as in `setFieldValue(e.target.valueAsNumber)`.

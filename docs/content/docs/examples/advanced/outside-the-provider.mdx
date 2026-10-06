@@ -1,0 +1,27 @@
+---
+title: 'Outside the Provider'
+description: "The order summary lives outside the form's FormProvider, in a different part of the page. It reads and updates the form through its formId."
+---
+
+import OutsideTheProvider from '@/examples/advanced/OutsideProvider';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <OutsideTheProvider />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/advanced/OutsideProvider.tsx"'
+    >
+      examples/advanced/OutsideProvider.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+The order summary isn't inside the form's `FormProvider`. The form has a `formId` and `skipJotaiProvider: true`, so its state lives in a shared Jotai store, and the summary passes the same `formId` to `useFormValues` and `useFormContext`. See [Using a form outside its provider](/docs/api/form-provider#using-a-form-outside-its-provider).

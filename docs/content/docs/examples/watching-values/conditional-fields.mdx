@@ -1,0 +1,29 @@
+---
+title: 'Conditional Fields'
+description: 'Change the answers and watch fields appear and disappear. When a field unmounts its value is removed, so hidden fields never leak into the submitted values.'
+---
+
+import ConditionalFields from '@/examples/watching-values/ConditionalFields';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <ConditionalFields />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/watching-values/ConditionalFields.tsx"'
+    >
+      examples/watching-values/ConditionalFields.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+[`useFieldWatch`](/docs/api/watch-hooks#usefieldwatch) subscribes small components to the answers that control follow-up questions, so the rest of the form doesn't re-render.
+
+When a field unmounts its edits are discarded, so hidden answers never reach `onSubmit`. See [Core Concepts](/docs/core-concepts#6-fields-come-and-go).

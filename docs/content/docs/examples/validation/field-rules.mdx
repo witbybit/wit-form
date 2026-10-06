@@ -1,0 +1,33 @@
+---
+title: 'Field Rules'
+description: 'Errors show after you leave a field, or for every field when you submit. Validation itself runs on every change, so an error clears as soon as you fix it.'
+---
+
+import FieldRules from '@/examples/validation/FieldValidation';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <FieldRules />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/validation/FieldValidation.tsx"'
+    >
+      examples/validation/FieldValidation.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+Each field takes a `validate(value)` function that returns an error message, or `null` when the value is valid. See [Validation](/docs/guides/validation#field-validation).
+
+- Validation runs on every change. The error shows once the field is touched.
+- On submit every field is validated and touched. If any fail, `onError(fieldErrors)` is called instead of `onSubmit`.
+- Validators are defined outside the component, because `validate` is read once, when the field mounts.
+
+The `TextField`, `NumberField`, `SelectField` and `CheckboxField` components come from the [shared example components](/docs/examples#shared-components).

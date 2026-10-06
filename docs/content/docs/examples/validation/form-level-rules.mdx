@@ -1,0 +1,29 @@
+---
+title: 'Form-level Rules'
+description: 'The initial values break several booking rules. Submit to see form-level errors next to field errors, then fix them.'
+---
+
+import FormLevelRules from '@/examples/validation/FormLevelValidation';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <FormLevelRules />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/validation/FormLevelValidation.tsx"'
+    >
+      examples/validation/FormLevelValidation.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+[`useForm({ validate })`](/docs/api/use-form#validate) receives every value and returns a list of messages, for rules that span several fields like a date range or a guest limit.
+
+It runs on submit together with field validation. `onError(fieldErrors, formErrors, values)` receives both kinds of error, so the form can show a summary.

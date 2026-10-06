@@ -1,0 +1,31 @@
+---
+title: 'Multi-step Wizard'
+description: 'Each step is validated before you can move on. Go back and forth: values from hidden steps are kept, and the review step reads them all.'
+---
+
+import MultiStepWizard from '@/examples/patterns/MultiStepWizard';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <MultiStepWizard />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/patterns/MultiStepWizard.tsx"'
+    >
+      examples/patterns/MultiStepWizard.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+A long form split into steps that share one `useForm`.
+
+- [`skipUnregister: true`](/docs/api/use-form#skipunregister) keeps values from steps that are no longer rendered.
+- [`validateFields(names)`](/docs/api/use-form#validatefields) validates only the current step before moving on.
+- The review step reads everything with [`useFormValuesAndExtraInfos`](/docs/api/watch-hooks#useformvaluesandextrainfos).

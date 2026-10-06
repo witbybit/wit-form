@@ -1,3 +1,6 @@
+packages:
+  - docs
+
 # Supply-chain protections
 # Only install package versions that have been published for at least 3 days,
 # which gives the ecosystem time to catch compromised releases.
@@ -12,3 +15,5 @@ trustPolicyExclude:
 # Dependency install scripts are blocked unless explicitly allowed here.
 allowBuilds:
   esbuild: true
+  # wrangler's local runtime; the platform binary comes from an optional dependency, and deploys don't need it
+  workerd: false

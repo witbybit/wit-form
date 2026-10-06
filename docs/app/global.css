@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+/* Tie Tailwind's dark: variant to the theme toggle instead of the OS setting */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --animate-wf-pulse-all: wf-pulse 2.4s ease-out infinite;
+  --animate-wf-caret: wf-caret 1s steps(1) infinite;
+
+  @keyframes wf-pulse {
+    0%,
+    100% {
+      background-color: var(--wf-cell);
+      box-shadow: none;
+    }
+    6% {
+      background-color: var(--wf-hot);
+      box-shadow: 0 0 12px var(--wf-hot);
+    }
+    30% {
+      background-color: var(--wf-cell);
+      box-shadow: none;
+    }
+  }
+
+  @keyframes wf-caret {
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+/* Brand accent for the docs UI (active links, TOC, focus rings), matching the landing page.
+   Surfaces stay on the neutral preset. */
+:root {
+  --color-fd-primary: oklch(50.8% 0.118 165.612); /* emerald-700 */
+  --color-fd-primary-foreground: oklch(98.5% 0 0);
+  --color-fd-ring: oklch(59.6% 0.145 163.225); /* emerald-600 */
+}
+
+.dark {
+  --color-fd-primary: oklch(76.5% 0.177 163.223); /* emerald-400 */
+  --color-fd-primary-foreground: oklch(14.1% 0.005 285.823); /* zinc-950 */
+  --color-fd-ring: oklch(69.6% 0.17 162.48); /* emerald-500 */
+}
+
+/* Sidebar search: a little taller, with the brand accent on hover */
+#nd-sidebar [data-search-full] {
+  min-height: 2.25rem;
+  transition:
+    border-color 150ms,
+    background-color 150ms,
+    color 150ms;
+}
+
+#nd-sidebar [data-search-full]:hover {
+  border-color: color-mix(in oklab, var(--color-fd-primary) 45%, transparent);
+}
