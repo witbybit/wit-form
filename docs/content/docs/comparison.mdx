@@ -1,0 +1,87 @@
+---
+title: 'Comparison'
+description: 'How Wit Form compares with React Hook Form, TanStack Form and Formik: where it fits, and where another library is the better choice.'
+---
+
+Each of these libraries makes different trade-offs. This page tries to show them fairly, including the places where Wit Form is behind. The facts were checked against each library's latest release in October 2026: React Hook Form 7.89, TanStack Form 1.33, Formik 2.4.9 and Wit Form 0.1.
+
+## At a glance
+
+✅ yes or a strength · ⚠️ partly, or with a catch · ❌ no
+
+|                                     | Wit Form                                     | React Hook Form                                           | TanStack Form                                       | Formik                                 |
+| ----------------------------------- | -------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------- | -------------------------------------- |
+| 🧠 **State model**                  | One Jotai atom per field                     | Uncontrolled inputs (refs) + proxy state                  | Controlled, one store with selectors                | Controlled, one reducer for the form   |
+| ⚡ **Typing re-renders**            | ✅ That field and its watchers               | ✅ Nothing for native inputs, or the one `Controller`     | ✅ That `form.Field` and its subscribers            | ❌ The whole form (unless `FastField`) |
+| 📦 **Size (min + gzip)**            | ✅ ~7 kB, plus ~4 kB for Jotai               | ~15 kB                                                    | ~19 kB                                              | ~15 kB                                 |
+| 🔗 **Runtime dependencies**         | Jotai (peer)                                 | ✅ None                                                   | TanStack Store packages                             | ⚠️ 8, including lodash                 |
+| ⏳ **Async validation**             | ❌ No                                        | ✅ Yes                                                    | ✅ Yes, with built-in debounce                      | ✅ Yes                                 |
+| 📐 **Schema validation**            | ⚠️ Call it yourself inside a validator       | ✅ Zod, Yup, Valibot and others via `@hookform/resolvers` | ✅ Standard Schema built in (Zod, Valibot, ArkType) | ⚠️ Yup built in                        |
+| 🧪 **Validation levels**            | Field, field array, form                     | Field, field array (`rules`), form, schema                | Field (including array fields), form, schema        | Field, form, schema                    |
+| 🔒 **Type-safe field names**        | ❌ No, names are strings                     | ✅ Yes                                                    | ✅ Yes                                              | ❌ No                                  |
+| 📋 **Field arrays**                 | ✅ Nested, stable `rowId`s                   | ✅ Nested, stable `id`s                                   | ⚠️ Nested, keyed by index                           | ⚠️ Nested, keyed by index              |
+| 🔀 **Array operations**             | append, insert, remove, clear, replace       | + prepend, swap, move, update                             | + swap, move, replace                               | + swap, move, unshift, pop             |
+| 🙈 **Value of an unmounted field**  | Discarded (opt out with `skipUnregister`)    | Kept (opt in to drop with `shouldUnregister`)             | Kept                                                | Kept                                   |
+| 🏷️ **Extra data next to a value**   | ✅ Yes, `extraInfo`                          | ❌ No                                                     | ❌ No                                               | ❌ No                                  |
+| 👀 **Watch one column of an array** | ✅ Yes, `useFieldArrayColumnWatch`           | ⚠️ Watch the whole array, or each cell by name            | ✅ Subscribe with a selector                        | ❌ No, every change re-renders         |
+| 🖥️ **Server actions / SSR helpers** | ❌ No                                        | ⚠️ `<Form>` component, no server-action helper            | ✅ Packages for Next.js, TanStack Start, Remix      | ❌ No                                  |
+| 🌐 **Frameworks**                   | React                                        | React (and React Native)                                  | ✅ React, Vue, Angular, Solid, Svelte, Lit, Preact  | React                                  |
+| 🛠️ **Devtools**                     | ❌ No                                        | ✅ `@hookform/devtools`                                   | ⚠️ TanStack Devtools plugin (pre-1.0)               | ❌ No                                  |
+| 🔧 **Maintenance**                  | 🌱 New (0.1), successor to react-recoil-form | ✅ Very active, v8 in beta                                | ✅ Active, v2 in alpha                              | ⚠️ No commits since November 2025      |
+
+Sizes are for the full package, minified and gzipped, measured with React external. Jotai costs nothing extra if your app already uses it.
+
+## React Hook Form
+
+React Hook Form is the default choice for most React apps, and for good reasons. It's mature, has no dependencies, has typed field names, supports async validation and works with almost every schema library through resolvers. With native inputs and `register`, typing doesn't re-render React at all, which is cheaper than any of the other libraries here, Wit Form included.
+
+**Choose React Hook Form if** you want the most widely used option, you mostly use native inputs, or you rely on schema validation and type-checked field names.
+
+**Where Wit Form differs:**
+
+- Every field is controlled, so custom inputs, date pickers and selects don't need a separate `Controller` path. The same `useField` works for all of them.
+- Fields are dropped from the values when they unmount. In React Hook Form they're kept by default, so a hidden conditional field can still be submitted unless you set `shouldUnregister`.
+- `extraInfo` stores data such as an option's label or a `File` preview next to a value. In React Hook Form you keep that state yourself.
+- `useFieldArrayColumnWatch` subscribes to only some columns of a field array, which helps with running totals over large tables.
+
+## TanStack Form
+
+TanStack Form has the strongest TypeScript story of the four: field names and values are inferred deeply from `defaultValues`. Async validators come with built-in debouncing, Standard Schema works without an adapter, and it has official packages for Next.js server actions and for other frameworks. Re-renders are scoped to each `form.Field`, so typing stays as cheap as it is in Wit Form.
+
+**Choose TanStack Form if** you need type-safe paths, debounced async validation (such as "is this username taken?"), server-side validation, or the same form logic in a framework other than React.
+
+**Where Wit Form differs:**
+
+- Less API to learn: plain hooks and plain validator functions, with no `validators` map and no form-level type parameters.
+- Field array rows get stable `rowId`s, so React keys and row state survive inserts and removals without you adding ids to your data.
+- Fields are dropped from the values when they unmount. TanStack Form keeps the value and only resets the field's errors.
+- A smaller bundle, especially if you already use Jotai.
+
+## Formik
+
+Formik was the most popular form library for years and is still widely installed. Today it's largely unmaintained: the last releases (November 2025) were small React 19 fixes, and the previous one was in April 2024. All state lives in one reducer, so every keystroke re-renders the whole form and every component that reads it. `FastField` helps, but only for simple cases.
+
+**Choose Formik if** you're maintaining an app that already uses it and the forms are small. For new projects, any of the other three is a better fit.
+
+**Moving from Formik to Wit Form** mostly means replacing `<Formik>` with a `FormProvider`, `useFormik` with `useForm`, and `<Field>` with `useField` or Wit Form's `<Field>`. Formik's `validationSchema` has no direct equivalent. Move those rules into field validators, or into `useForm`'s `validate` (see [Validation](/docs/guides/validation)).
+
+## When Wit Form is a good fit
+
+- **Large, dynamic forms**: long tables, nested field arrays, forms with hundreds of inputs. Typing re-renders only the cell you're in, with no memoization on your part. See the [Render Performance example](/docs/examples/advanced/render-performance).
+- **Forms with many custom inputs** that need to be controlled anyway.
+- **Forms with lots of conditional fields**, where hidden fields shouldn't end up in the submitted values.
+- **Apps that already use Jotai**, where the extra cost is about 7 kB.
+- **Apps moving off react-recoil-form**: it's a drop-in replacement. See [Migrating](/docs/guides/migrating).
+
+## When to pick something else
+
+Be honest with yourself about these. Wit Form doesn't have them today:
+
+- **Async validation.** Validators are synchronous. To check something on the server, run the request yourself and put the result in the form with `setValue` or a validator that reads it.
+- **Schema validation adapters.** You can call Zod or Yup inside a validator, but there's no resolver that maps a whole schema onto your fields.
+- **Type-safe field names.** Names are strings and values are typed per field with `useField<Value>`, so a typo in a name isn't a compile error.
+- **Form-wide state flags** such as `isValid`, `isSubmitted` or `submitCount`. `formState` has only `isSubmitting`, and dirty tracking is form-wide only (`useIsDirty`).
+- **Server actions, SSR helpers, devtools, or frameworks other than React.**
+- **A large community.** Wit Form is new. React Hook Form has far more answers, examples and integrations online.
+
+If any of these is a must-have, React Hook Form or TanStack Form will serve you better.
