@@ -14,33 +14,6 @@ html > body[data-scroll-locked] {
 /* Tie Tailwind's dark: variant to the theme toggle instead of the OS setting */
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --animate-wf-pulse-all: wf-pulse 2.4s ease-out infinite;
-  --animate-wf-caret: wf-caret 1s steps(1) infinite;
-
-  @keyframes wf-pulse {
-    0%,
-    100% {
-      background-color: var(--wf-cell);
-      box-shadow: none;
-    }
-    6% {
-      background-color: var(--wf-hot);
-      box-shadow: 0 0 12px var(--wf-hot);
-    }
-    30% {
-      background-color: var(--wf-cell);
-      box-shadow: none;
-    }
-  }
-
-  @keyframes wf-caret {
-    50% {
-      opacity: 0;
-    }
-  }
-}
-
 /* Brand accent for the docs UI (active links, TOC, focus rings), matching the landing page.
    Surfaces stay on the neutral preset. */
 :root {
