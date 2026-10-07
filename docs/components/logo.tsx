@@ -10,13 +10,25 @@ export function Logo() {
         className="size-6 shrink-0 drop-shadow-[0_0_10px_rgb(16_185_129/0.35)]"
       >
         <rect width="32" height="32" rx="8" fill="#059669" />
-        <path
-          d="M8 10l3 12 5-9 5 9 3-12"
-          fill="none"
-          stroke="#fff"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        {/* Form fields; only the active one is lit, like a field-level re-render */}
+        <rect
+          x="7"
+          y="8.5"
+          width="18"
+          height="4"
+          rx="2"
+          fill="#fff"
+          fillOpacity="0.4"
+        />
+        <rect x="7" y="14" width="18" height="4" rx="2" fill="#fff" />
+        <rect
+          x="7"
+          y="19.5"
+          width="11"
+          height="4"
+          rx="2"
+          fill="#fff"
+          fillOpacity="0.4"
         />
       </svg>
       <span className="font-semibold tracking-tight">{appName}</span>

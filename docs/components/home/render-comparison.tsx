@@ -49,14 +49,21 @@ function createDemoStore() {
   const empty = { keystrokes: 0, shared: 0, atoms: 0 };
   let snapshot = empty;
   let ready = false;
+  // While the form restores its starting values, those renders aren't the visitor's doing
+  let restoring: ReturnType<typeof setTimeout> | undefined;
   let playback: ReturnType<typeof setInterval> | undefined;
   const listeners = new Set<() => void>();
-  const typers = new Set<(value: string) => void>();
+  const typers = new Set<(name: string, value: string) => void>();
   const notify = () => listeners.forEach((listener) => listener());
 
   const stopPlayback = () => {
     clearInterval(playback);
     playback = undefined;
+  };
+
+  const stopRestoring = () => {
+    clearTimeout(restoring);
+    restoring = undefined;
   };
 
   const reset = () => {
@@ -65,15 +72,16 @@ function createDemoStore() {
     notify();
   };
 
-  const type = (value: string) => {
+  const type = (name: string, value: string) => {
     snapshot = { ...snapshot, keystrokes: snapshot.keystrokes + 1 };
     notify();
-    typers.forEach((setValue) => setValue(value));
+    typers.forEach((setValue) => setValue(name, value));
   };
 
   return {
-    get ready() {
-      return ready;
+    /** Whether renders right now come from the visitor, so they count and flash */
+    get counting() {
+      return ready && !restoring;
     },
     subscribe(listener: () => void) {
       listeners.add(listener);
@@ -82,35 +90,57 @@ function createDemoStore() {
     getSnapshot: () => snapshot,
     getServerSnapshot: () => empty,
     bump(side: Side) {
+      if (restoring) return;
       snapshot = { ...snapshot, [side]: snapshot[side] + 1 };
       notify();
     },
     /** Zeroes the tallies; also called once mounting settles, so they open at 0 */
     reset,
-    onType(setValue: (value: string) => void) {
+    onType(setValue: (name: string, value: string) => void) {
       typers.add(setValue);
       return () => {
         typers.delete(setValue);
       };
     },
-    type(value: string) {
+    type(name: string, value: string) {
       stopPlayback();
-      // The first keystroke can beat the settle timer, so start counting from it
-      if (!ready) reset();
-      type(value);
+      // The first keystroke can beat the settle or restore timer, so start counting from it
+      if (!ready || restoring) {
+        stopRestoring();
+        reset();
+      }
+      type(name, value);
+    },
+    /** Puts every field back to its starting value, then zeroes the tallies */
+    restore(then?: () => void) {
+      stopPlayback();
+      stopRestoring();
+      for (const field of FIELDS) {
+        typers.forEach((setValue) =>
+          setValue(field.name, INITIAL_VALUES[field.name])
+        );
+      }
+      // Wit Form settles each field over a couple of renders, so wait them out
+      restoring = setTimeout(() => {
+        restoring = undefined;
+        reset();
+        then?.();
+      }, 150);
     },
     play() {
-      stopPlayback();
-      reset();
-      let length = 0;
-      type('');
-      playback = setInterval(() => {
-        length += 1;
-        type(SAMPLE_TEXT.slice(0, length));
-        if (length === SAMPLE_TEXT.length) stopPlayback();
-      }, 110);
+      this.restore(() => {
+        let length = 0;
+        playback = setInterval(() => {
+          length += 1;
+          type('name', SAMPLE_TEXT.slice(0, length));
+          if (length === SAMPLE_TEXT.length) stopPlayback();
+        }, 110);
+      });
     },
-    stopPlayback,
+    stop() {
+      stopPlayback();
+      stopRestoring();
+    },
   };
 }
 
@@ -141,7 +171,7 @@ function useRenderFlash(side: Side) {
   useEffect(() => {
     store.bump(side);
     if (
-      !store.ready ||
+      !store.counting ||
       !ref.current ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
     ) {
@@ -161,45 +191,42 @@ function useRenderFlash(side: Side) {
 
 function FieldBox(props: {
   side: Side;
+  name: string;
   label: string;
   value: string;
-  editable?: boolean;
 }) {
   const store = useDemo();
   const ref = useRenderFlash(props.side);
   const formName = props.side === 'shared' ? 'shared form state' : 'Wit Form';
+  // Name is the empty, full-width field that invites the first keystroke
+  const featured = props.name === 'name';
 
   return (
     <div
       ref={ref}
       className={cn(
-        'flex h-9 min-w-0 items-center gap-3 rounded-md border bg-fd-background/70 px-3 text-sm',
-        props.editable &&
-          'col-span-full border-fd-foreground/25 focus-within:border-emerald-500/60 focus-within:ring-2 focus-within:ring-emerald-500/25'
+        'flex h-9 min-w-0 items-center gap-3 rounded-md border bg-fd-background/70 px-3 text-sm transition-colors hover:border-fd-foreground/25 focus-within:border-emerald-500/60 focus-within:ring-2 focus-within:ring-emerald-500/25',
+        featured && 'col-span-full border-fd-foreground/25'
       )}
     >
       <span
         className={cn(
           'w-16 shrink-0 font-mono text-[11px] text-fd-muted-foreground',
           // Phones show two narrow columns, where the values speak for themselves
-          !props.editable && 'max-sm:hidden'
+          !featured && 'max-sm:hidden'
         )}
       >
         {props.label}
       </span>
-      {props.editable ? (
-        <input
-          value={props.value}
-          onChange={(e) => store.type(e.target.value)}
-          placeholder="Type here…"
-          aria-label={`${props.label} (${formName})`}
-          spellCheck={false}
-          autoComplete="off"
-          className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-fd-muted-foreground/70"
-        />
-      ) : (
-        <span className="truncate text-fd-muted-foreground">{props.value}</span>
-      )}
+      <input
+        value={props.value}
+        onChange={(e) => store.type(props.name, e.target.value)}
+        placeholder={featured ? 'Type here…' : props.label}
+        aria-label={`${props.label} (${formName})`}
+        spellCheck={false}
+        autoComplete="off"
+        className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-fd-muted-foreground/70"
+      />
     </div>
   );
 }
@@ -213,9 +240,9 @@ function SharedField(props: { name: string; label: string }) {
   return (
     <FieldBox
       side="shared"
+      name={props.name}
       label={props.label}
       value={values[props.name]}
-      editable={props.name === 'name'}
     />
   );
 }
@@ -225,7 +252,10 @@ function SharedForm() {
   const [values, setValues] = useState(INITIAL_VALUES);
 
   useEffect(
-    () => store.onType((name) => setValues((prev) => ({ ...prev, name }))),
+    () =>
+      store.onType((name, value) =>
+        setValues((prev) => ({ ...prev, [name]: value }))
+      ),
     [store]
   );
 
@@ -244,19 +274,22 @@ function SharedForm() {
 
 function AtomField(props: { name: string; label: string }) {
   const store = useDemo();
-  const editable = props.name === 'name';
   const { fieldValue, setFieldValue } = useField<string>({ name: props.name });
 
-  useEffect(() => {
-    if (editable) return store.onType(setFieldValue);
-  }, [editable, store, setFieldValue]);
+  useEffect(
+    () =>
+      store.onType((name, value) => {
+        if (name === props.name) setFieldValue(value);
+      }),
+    [store, props.name, setFieldValue]
+  );
 
   return (
     <FieldBox
       side="atoms"
+      name={props.name}
       label={props.label}
       value={fieldValue ?? ''}
-      editable={editable}
     />
   );
 }
@@ -347,9 +380,8 @@ function Controls() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-fd-muted-foreground">
-        Type in either{' '}
-        <span className="font-medium text-fd-foreground">Name</span> field.
-        Keystrokes go to both forms, and the counters are real React renders.
+        Edit any field in either form. Keystrokes go to both, and the counters
+        are real React renders.
       </p>
       <div className="flex gap-2">
         <button
@@ -361,13 +393,10 @@ function Controls() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            store.stopPlayback();
-            store.reset();
-          }}
+          onClick={() => store.restore()}
           className="inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-fd-muted-foreground transition outline-none hover:bg-fd-accent hover:text-fd-foreground focus-visible:ring-2 focus-visible:ring-emerald-500"
         >
-          <RotateCcw className="size-3.5" /> Reset counters
+          <RotateCcw className="size-3.5" /> Reset
         </button>
       </div>
     </div>
@@ -415,7 +444,7 @@ export function RenderComparison() {
     }, 300);
     return () => {
       clearTimeout(timer);
-      store.stopPlayback();
+      store.stop();
     };
   }, [store]);
 
