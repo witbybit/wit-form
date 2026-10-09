@@ -71,15 +71,17 @@ A field's validator runs on every change, so it always knows whether the field i
 - the form is submitted, or
 - you validate it yourself with `validateFields`.
 
-Before that, `error` from `useField` is `undefined`. A user typing their email for the first time doesn't see "Invalid email" after the first letter. Once the field is touched, the error updates live and disappears as soon as the value is fixed.
+Before that, `error` from `useField` is `undefined`. A user typing their email for the first time doesn't see "Invalid email" after the first letter. Once the field is touched, the error updates live and disappears as soon as the value is fixed. To show errors earlier or later, set `useForm`'s [`mode`](/docs/api/use-form#mode).
 
-There are three levels of validation, all covered in [Validation](/docs/guides/validation):
+There are three levels of validation, all covered in [Validation](/docs/guides/validation). Each one takes a plain function, which can be `async`, or a schema from any Standard Schema library, like Zod or Valibot:
 
-| Level       | Where                         | Good for                                     |
-| ----------- | ----------------------------- | -------------------------------------------- |
-| Field       | `useField({ validate })`      | "Required", formats, ranges                  |
-| Field array | `useFieldArray({ validate })` | "Add at least one row", duplicates           |
-| Form        | `useForm({ validate })`       | Rules across several fields, like date range |
+| Level       | Where                                 | Good for                                     |
+| ----------- | ------------------------------------- | -------------------------------------------- |
+| Field       | `useField({ validate, schema })`      | "Required", formats, ranges, server checks   |
+| Field array | `useFieldArray({ validate, schema })` | "Add at least one row", duplicates           |
+| Form        | `useForm({ validate, schema })`       | Rules across several fields, like date range |
+
+A form-level `schema` can describe the whole form at once. Its errors appear on the matching fields.
 
 ## 6. Fields come and go
 
@@ -103,7 +105,7 @@ Putting it together, here is what happens from mount to submit:
 1. **Mount.** `useForm` stores `initialValues`. Each field reads its starting value from them, or uses its `defaultValue`.
 2. **Editing.** Each change updates one field's atom and runs its validator. Components watching that field re-render.
 3. **Leaving a field.** `onBlur` marks the field as touched, so its error, if any, appears.
-4. **Submit.** `handleSubmit` validates every mounted field, every field array, and the form-level `validate`. All fields become touched.
-   - If anything fails, `onError` is called with the errors and `onSubmit` is not.
+4. **Submit.** `handleSubmit` validates every mounted field, every field array, the form schema and the form-level `validate`, waiting for any async validators. Every failing field becomes touched.
+   - If anything fails, `onError` is called with the errors and `onSubmit` is not. The first invalid field is focused, if its `ref` is attached.
    - Otherwise `onSubmit(values, extraInfos)` is called. While a returned promise is pending, `formState.isSubmitting` is `true`.
 5. **After a successful submit.** The submitted values become the new initial values, so the form counts as unchanged (not dirty) again. Read more in [Loading and Saving Data](/docs/guides/loading-and-saving).

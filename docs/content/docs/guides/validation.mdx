@@ -1,6 +1,6 @@
 ---
 title: 'Validation'
-description: 'Wit Form validates at three levels: single fields, field arrays, and the whole form. This guide covers each one and when to use it.'
+description: 'Wit Form validates single fields, field arrays and the whole form, with plain functions, async checks or a schema (Zod, Valibot, ArkType and others). This guide covers each one and when to use it.'
 ---
 
 ## Validators are plain functions
@@ -12,7 +12,9 @@ const validateAge = (value?: number) =>
   value !== undefined && value < 18 ? 'You must be 18 or older' : null;
 ```
 
-There's no schema language to learn. Use any library you like inside a validator (Zod, Yup, validator.js) as long as you return a string or `null`.
+A validator can also be `async` and return a promise of the message, for checks that need the server. See [Async validation](#async-validation).
+
+If you already describe your data with a schema library, pass the schema instead. See [Schema validation](#schema-validation).
 
 ## Field validation
 
@@ -36,7 +38,21 @@ function EmailField() {
 
 ### When errors appear
 
-The validator runs **on every change**, but `error` is only returned once the field is **touched**: after `onBlur`, after a submit, or after you call `validateFields` on it. Connect `onBlur` to your input, or errors only appear on submit.
+The validator runs **on every change**, but by default `error` is only returned once the field is **touched**: after `onBlur`, after a submit, or after you call `validateFields` on it. Connect `onBlur` to your input, or errors only appear on submit.
+
+To change when errors show, pass `mode` to `useForm`:
+
+| `mode`                  | A field's error shows                                  |
+| ----------------------- | ------------------------------------------------------ |
+| `'onTouched'` (default) | after the field is blurred, or after a submit          |
+| `'onChange'`            | as soon as the user changes the field                  |
+| `'onSubmit'`            | only after the first submit (or `validateFields` call) |
+
+```tsx
+useForm({ mode: 'onSubmit', onSubmit });
+```
+
+The mode only decides when errors are **shown**. Validation still runs on every change, so `formState.isValid` is always up to date.
 
 ### Define validators outside your component
 
@@ -100,6 +116,108 @@ Keep the callback's dependencies stable. A new function on every render causes e
 
 See the [Dynamic Rules example](/docs/examples/validation/dynamic-rules).
 
+## Async validation
+
+Some checks need the server, like "is this username taken?". Make the validator `async`, or return a promise:
+
+```tsx
+const validateUsername = async (value?: string) => {
+  if (!value || value.length < 3) return null; // cheap checks first
+  const available = await api.isUsernameAvailable(value);
+  return available ? null : 'This username is taken';
+};
+
+function UsernameField() {
+  const { fieldValue, setFieldValue, onBlur, error, isValidating } =
+    useField<string>({
+      name: 'username',
+      validate: validateUsername,
+      // Wait until typing pauses for 400 ms before validating
+      debounceValidation: 400,
+    });
+  // ...render the input, `error`, and a spinner while `isValidating`
+}
+```
+
+- **`isValidating`** is `true` while the validator runs, and while a debounced validation is waiting.
+- **`debounceValidation`** (milliseconds) waits for typing to pause, so the server isn't asked about every keystroke.
+- **Outdated results are ignored.** If the user keeps typing and an older check finishes after a newer one, the older result is dropped.
+- **A failing check blocks submission.** If the promise rejects or the validator throws, the error's message (or "Validation failed") becomes the field's error, so a network failure can't let invalid data through.
+- **Validators also run when the field mounts**, so `formState.isValid` is accurate from the start. Return early for empty values to avoid a request on mount, as above.
+
+Field array validators and the form-level `validate` can be async too.
+
+### Submitting with async validators
+
+`handleSubmit` waits for pending async validators before deciding. While it waits, `formState.isValidating` is `true`. Use it to disable the submit button:
+
+```tsx
+const { handleSubmit, formState } = useForm({ onSubmit });
+
+<button disabled={formState.isSubmitting || formState.isValidating}>
+  Save
+</button>;
+```
+
+When no validator is async, submitting stays fully synchronous, as before.
+
+See the [Async Rules example](/docs/examples/validation/async-rules).
+
+## Schema validation
+
+If you describe your data with a schema, pass it as `schema`. Wit Form supports [Standard Schema](https://standardschema.dev), the interface that Zod, Valibot, ArkType, Effect Schema, Yup (1.7 and newer) and others implement. There's nothing extra to install.
+
+### A schema for the whole form
+
+```tsx
+import { z } from 'zod';
+
+const signupSchema = z.object({
+  name: z.string().min(1, 'Required'),
+  address: z.object({ city: z.string().min(1, 'Required') }),
+  items: z
+    .array(z.object({ qty: z.number().min(1, 'At least 1') }))
+    .min(1, 'Add an item'),
+});
+
+useForm({ schema: signupSchema, onSubmit });
+```
+
+Each issue the schema reports goes to the field at its path:
+
+- `name` and `address.city` go to those fields.
+- `items[1].qty` goes to the `qty` field in the second row of the `items` field array.
+- `items` itself (for "Add an item") goes to the field array, as its `error`.
+- An issue with no matching field, like a `.refine` across fields, becomes a **form error**: it's in `formState.formErrors` and passed to `onError`.
+
+The schema runs again whenever a value changes, so errors clear as soon as they're fixed and `formState.isValid` stays accurate. Each field still shows its error according to the [mode](#when-errors-appear). Define the schema outside your component, so it isn't rebuilt on every render.
+
+A form schema checks the values. `onSubmit` still receives the values as they are in the form, not the schema's parsed output, so transforms like `z.coerce` don't change what you submit.
+
+See the [Schema Rules example](/docs/examples/validation/schema-rules).
+
+### A schema for one field
+
+`useField` and `<Field>` accept a `schema` for that field's value:
+
+```tsx
+useField({ name: 'email', schema: z.email('Enter a valid email') });
+```
+
+When a field has both a `schema` and a `validate`, the schema runs first, and `validate` only runs once the schema passes. A field schema can be async.
+
+### A schema for a field array
+
+`useFieldArray` accepts a `schema` for the list of rows, for rules like a minimum length:
+
+```tsx
+useFieldArray({
+  name: 'people',
+  fieldNames: ['email'],
+  schema: z.array(z.object({ email: z.string() })).min(1, 'Add a person'),
+});
+```
+
 ## Field array validation
 
 A field array can validate its rows as a whole, for rules like "add at least one item" or "no duplicate emails":
@@ -144,24 +262,62 @@ useForm({
 });
 ```
 
-Form-level validation runs **only on submit**. Its messages aren't tied to a field, so show them yourself, for example in a banner, from `onError`.
+Form-level validation runs **only on submit**, and it can be `async`. Its messages aren't tied to a field. They're passed to `onError`, and kept in `formState.formErrors` until the next submit, so you can show them in a banner:
+
+```tsx
+const { formState } = useForm({ validate, onSubmit });
+
+{
+  formState.formErrors.length > 0 && <Banner>{formState.formErrors}</Banner>;
+}
+```
 
 To change the form-level rule from a child component, use [useSetFormProps](/docs/api/use-set-form-props).
 
 See the [Form-level Rules example](/docs/examples/validation/form-level-rules).
 
+## Errors from the server
+
+Some errors are only known after the server answers, like "this email is already registered". Show them with `setError`, from `useForm` or `useFormContext`:
+
+```tsx
+const { handleSubmit, setError, setFormErrors } = useForm({
+  onSubmit: async (values) => {
+    const result = await api.signUp(values);
+    if (result.emailTaken) {
+      setError('email', 'This email is already registered');
+      return false; // keep the user's edits
+    }
+    if (!result.ok) {
+      setFormErrors(['Something went wrong. Try again.']);
+      return false;
+    }
+  },
+});
+```
+
+- `setError(name, message)` shows the message on that field right away, whatever the mode. For a field in a row, pass `{ name, type: 'field', ancestors }`. For a field array, pass `{ name, type: 'field-array' }`.
+- The error stays until the field validates again, which happens when its value changes.
+- `setFormErrors(messages)` sets `formState.formErrors`.
+- `clearErrors()` clears every error and form error. `clearErrors(['email'])` clears only those fields.
+
 ## What happens on submit
 
 `handleSubmit` runs, in this order:
 
-1. Every mounted field's validator, with all form values as `other.values`.
+1. Every mounted field's validator (and field schema), with all form values as `other.values`.
 2. Every field array's validator, and the validators of the fields in its rows.
-3. The form-level `validate`.
+3. The form schema, if there is one.
+4. The form-level `validate`.
+
+If any validator is async, it waits for all of them, with `formState.isValidating` set to `true`.
 
 Every field that failed becomes touched, so its error shows. Then:
 
-- If there were **any** errors, `onError(fieldErrors, formErrors, values)` is called, and `onSubmit` is not.
+- If there were **any** errors, `onError(fieldErrors, formErrors, values)` is called, and `onSubmit` is not. The first invalid field is focused, if you attached its [`ref`](#focusing-the-first-invalid-field).
 - Otherwise, `onSubmit(values, extraInfos)` is called.
+
+`formState` tracks the result: `submitCount` goes up by one, `isSubmitted` becomes `true`, and `isSubmitSuccessful` says whether validation passed and `onSubmit` finished without failing.
 
 `fieldErrors` is a list of objects describing each failing field:
 
@@ -174,26 +330,62 @@ Every field that failed becomes touched, so its error shows. Then:
 }
 ```
 
-## Validating without submitting
+## Focusing the first invalid field
 
-`useForm` gives you two functions for validating on demand. `validateAllFields` is also available from `useFormContext`:
+`useField` returns a `ref`. Attach it to the input, and when a submit fails, the first invalid field on the page is focused:
 
 ```tsx
-const { validateFields, validateAllFields } = useForm({ onSubmit });
+const { fieldValue, setFieldValue, error, ref } = useField({ name: 'email' });
+
+<input ref={ref} value={fieldValue ?? ''} /* ... */ />;
+```
+
+Turn it off with `useForm({ shouldFocusError: false })`. To focus a field yourself, call `setFocus(name)` from `useForm` or `useFormContext`.
+
+## Validating without submitting
+
+`useForm` gives you functions for validating on demand. `validateAllFields` and `validateAllFieldsAsync` are also available from `useFormContext`:
+
+```tsx
+const { validateFields, validateFieldsAsync, validateAllFields } = useForm({
+  onSubmit,
+});
 
 // Validate some fields, like the current step of a wizard
 const errors = validateFields(['email', 'password']);
 if (errors.length === 0) goToNextStep();
 
+// The same, waiting for async validators
+const asyncErrors = await validateFieldsAsync(['username']);
+
 // Validate every field and field array, without submitting
 const allErrors = validateAllFields();
 ```
 
-Both return the same error objects as `onError` and mark failing fields as touched. Neither runs the form-level `validate`.
+All of them return the same error objects as `onError` and mark failing fields as touched. They also apply the form schema. None of them runs the form-level `validate`.
+
+`validateFields` and `validateAllFields` return right away with the errors of sync validators. Async validators still run, and their errors show when they finish. Use `validateFieldsAsync` and `validateAllFieldsAsync` to wait for them.
 
 `validateFields` accepts top-level names as strings. For a field inside a row, pass `{ name, type: 'field', ancestors }`. A string that matches a top-level field array validates that array.
 
 The [Multi-step Wizard example](/docs/examples/patterns/multi-step-wizard) uses `validateFields` to check each step.
+
+## Knowing whether the form is valid
+
+`formState`, from `useForm` or [`useFormState`](/docs/api/use-form-state), has the form's validation state:
+
+```tsx
+const { formState } = useForm({ onSubmit });
+
+<button disabled={!formState.isValid}>Save</button>;
+```
+
+- `isValid`: no field or field array has an error, and the form schema passes. The form-level `validate` only runs on submit, so it isn't included.
+- `isValidating`: an async validator is running.
+- `errors`: every current field error, including ones not shown yet. Useful for an error summary.
+- `formErrors`: the form-level errors from the last submit.
+
+A component only re-renders when a property it reads changes, so reading `isValid` doesn't re-render on every keystroke.
 
 ## The `<Field>` shortcut
 

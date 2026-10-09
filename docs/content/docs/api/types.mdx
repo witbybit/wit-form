@@ -16,6 +16,14 @@ import type {
   IFieldArrayColWatchParams,
   IIsDirtyProps,
   IRemoveFieldParams,
+  IFormState,
+  Validator,
+  ValidationMode,
+  StandardSchemaV1,
+  FieldPath,
+  ArrayPath,
+  PathValue,
+  DeepPartial,
 } from 'wit-form';
 ```
 
@@ -73,6 +81,47 @@ type IChildFieldInfo =
   | { name: string; type: 'field' }
   | { name: string; type: 'field-array'; fieldNames: IChildFieldInfo[] };
 ```
+
+## `IFormState`
+
+The form state returned as `formState` by [`useForm`](/docs/api/use-form#formstate) and by [`useFormState`](/docs/api/use-form-state).
+
+```ts
+interface IFormState {
+  isSubmitting: boolean;
+  isSubmitted: boolean;
+  isSubmitSuccessful: boolean;
+  submitCount: number;
+  isValidating: boolean;
+  isValid: boolean;
+  isDirty: boolean;
+  errors: IFieldError[];
+  formErrors: string[];
+}
+```
+
+## `Validator`
+
+The type of `validate` and `validateCallback`. A validator returns an error message, `null`/`undefined` when the value is valid, or a promise of either.
+
+```ts
+type Validator<V = any, O = any> = (
+  value: V,
+  otherParams?: O
+) => string | null | undefined | Promise<string | null | undefined>;
+```
+
+## `ValidationMode`
+
+The values of `useForm`'s [`mode`](/docs/api/use-form#mode): `'onTouched' | 'onChange' | 'onSubmit'`.
+
+## `StandardSchemaV1`
+
+The [Standard Schema](https://standardschema.dev) interface accepted by every `schema` option. Zod, Valibot, ArkType, Effect Schema, Yup 1.7+ and other libraries implement it, so their schemas can be passed directly. `isStandardSchema(value)` checks whether a value implements it.
+
+## Path types
+
+`FieldPath`, `ArrayPath`, `PathValue` and `DeepPartial` describe field names and values. See [createFormHooks](/docs/api/create-form-hooks#path-types).
 
 ## Option types
 

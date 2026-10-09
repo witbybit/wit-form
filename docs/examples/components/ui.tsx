@@ -5,7 +5,7 @@
  * except FormInspector, which shows the live form state next to each example.
  */
 import { useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { useFormValuesAndExtraInfos, useIsDirty } from 'wit-form';
+import { useFormState, useFormValuesAndExtraInfos, useIsDirty } from 'wit-form';
 
 export const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -117,6 +117,8 @@ function Json(props: { value: unknown }) {
 export function FormInspector(props: {
   submitted?: unknown;
   showExtraInfos?: boolean;
+  /** Show isValid, isValidating and submitCount from useFormState */
+  showStatus?: boolean;
 }) {
   const { values, extraInfos } = useFormValuesAndExtraInfos();
   const isDirty = useIsDirty();
@@ -134,6 +136,7 @@ export function FormInspector(props: {
           {isDirty ? 'Dirty' : 'Pristine'}
         </span>
       </div>
+      {props.showStatus && <FormStatus />}
       <section>
         <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
           Live values
@@ -159,5 +162,27 @@ export function FormInspector(props: {
         )}
       </section>
     </div>
+  );
+}
+
+/** A few properties of useFormState. Only these re-render this component. */
+function FormStatus() {
+  const { isValid, isValidating, submitCount } = useFormState();
+  const items = [
+    ['Valid', isValid ? 'Yes' : 'No'],
+    ['Validating', isValidating ? 'Yes' : 'No'],
+    ['Submits', String(submitCount)],
+  ];
+  return (
+    <dl className="grid grid-cols-3 gap-2 text-center">
+      {items.map(([label, value]) => (
+        <div key={label} className="rounded-md bg-slate-50 px-2 py-1.5">
+          <dt className="text-[11px] uppercase tracking-wide text-slate-500">
+            {label}
+          </dt>
+          <dd className="font-medium text-slate-900 tabular-nums">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

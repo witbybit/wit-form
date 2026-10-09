@@ -6,11 +6,13 @@ description: 'Fast React forms where every field is a Jotai atom.'
 Each field keeps its state in its own atom, so typing in one field re-renders only that field, not the whole form. Large forms, long tables and dynamic field arrays stay fast without any memoization on your side.
 
 - **Field-level state:** `useField` subscribes a component to a single field.
-- **Field arrays:** add, insert and remove rows, including nested arrays. Only the cells that change re-render.
-- **Validation:** per field, per field array and form-wide, as values change and on submit.
+- **Field arrays:** add, insert, move, swap and remove rows, including nested arrays. Only the cells that change re-render.
+- **Validation:** per field, per field array and form-wide, with plain functions or any Standard Schema (Zod, Valibot, ArkType, Yup). Sync or async, with debouncing.
 - **Live values without re-renders:** watch specific fields, a column of a field array, or the whole form from any component.
-- **Dirty tracking, initial values, resets and async submit** built in.
-- **TypeScript** types included, ESM-only, about 7 kB gzipped.
+- **Form state:** `isValid`, `isDirty`, `isSubmitting`, `submitCount` and more. Components re-render only for the flags they read.
+- **Type-safe field names:** `createFormHooks<Values>()` checks every name, including fields in list rows.
+- **Initial values, resets, server errors and focus on the first invalid field** built in.
+- **TypeScript** types included, ESM-only, about 10 kB gzipped.
 
 ```sh
 pnpm add wit-form jotai

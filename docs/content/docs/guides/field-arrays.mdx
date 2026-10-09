@@ -92,16 +92,22 @@ On submit, `values.items` is an array of row objects, in display order:
 
 `useFieldArray` returns functions for every common change. Most take a row **index** (the position in the list), not a row id:
 
-| Call                       | What it does                                                                                  |
-| -------------------------- | --------------------------------------------------------------------------------------------- |
-| `append()`                 | Adds one empty row at the end.                                                                |
-| `append(row1, row2)`       | Adds rows with these values at the end.                                                       |
-| `insert(index, row)`       | Adds a row at `index`, pushing later rows down.                                               |
-| `remove(index)`            | Removes the row at `index`.                                                                   |
-| `clear(index)`             | Resets the fields of the row at `index` (to their `defaultValue`, if any), but keeps the row. |
-| `removeAll()`              | Removes every row.                                                                            |
-| `setFieldArrayValue(rows)` | Replaces all rows with new ones.                                                              |
-| `getFieldArrayValue()`     | Returns the current rows, without re-rendering.                                               |
+| Call                   | What it does                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| `append()`             | Adds one empty row at the end.                                                                |
+| `append(row1, row2)`   | Adds rows with these values at the end.                                                       |
+| `prepend(row)`         | Adds rows at the start.                                                                       |
+| `insert(index, row)`   | Adds a row at `index`, pushing later rows down.                                               |
+| `update(index, row)`   | Replaces the values of the row at `index`. The row keeps its id.                              |
+| `swap(indexA, indexB)` | Swaps two rows.                                                                               |
+| `move(from, to)`       | Moves a row to another position, e.g. after drag and drop.                                    |
+| `remove(index)`        | Removes the row at `index`. Pass an array, like `remove([0, 2])`, to remove several rows.     |
+| `clear(index)`         | Resets the fields of the row at `index` (to their `defaultValue`, if any), but keeps the row. |
+| `removeAll()`          | Removes every row.                                                                            |
+| `replace(rows)`        | Replaces all rows with new ones. Same as `setFieldArrayValue(rows)`.                          |
+| `getFieldArrayValue()` | Returns the current rows, without re-rendering.                                               |
+
+`swap` and `move` only change the order of the row ids. Each row keeps its id, its values, its errors and its touched state, so a memoized row component doesn't even re-render.
 
 Duplicating a row combines two of them:
 
@@ -124,7 +130,9 @@ const { error } = useFieldArray({
 });
 ```
 
-Define it outside the component, or memoize it. See [Validation](/docs/guides/validation#field-array-validation) for details, including a performance note.
+Define it outside the component, or memoize it. `validate` can be async, and you can pass a schema instead, like `schema: z.array(...).min(1)`. See [Validation](/docs/guides/validation#field-array-validation) for details, including a performance note.
+
+With a form-level [schema](/docs/guides/validation#schema-validation), issues for fields in rows, like `items[1].qty`, appear on the matching row's field without any extra setup.
 
 ## Totals and other calculated values
 
@@ -162,8 +170,14 @@ The [Invoice example](/docs/examples/field-arrays/invoice) puts all of this toge
 A row can contain its own list, like sections that each contain lessons. Each section row renders its own `useFieldArray` for the lessons, with the section row as its `ancestors`:
 
 ```tsx
-// The outer list
-useFieldArray({ name: 'sections', fieldNames: ['title'] });
+// The outer list. Declare the nested list in fieldNames too.
+useFieldArray({
+  name: 'sections',
+  fieldNames: [
+    'title',
+    { name: 'lessons', type: 'field-array', fieldNames: ['title', 'minutes'] },
+  ],
+});
 
 // Rendered inside each section row
 function Lessons(props: { sectionRowId: number }) {
@@ -204,13 +218,17 @@ Initial values, resets and submitted values all include the nested lists:
 }
 ```
 
-### Current limitations
+### Adding and replacing rows with nested lists
 
-Nested lists have a few rough edges in this version:
+Because the outer list declares `lessons` in its `fieldNames`, every way of adding rows can include their nested rows, even before the nested list has rendered:
 
-- `append({ title: 'New section', lessons: [...] })` adds the section but not its lessons. Add an empty section and let the inner array's `defaultValue` provide the first rows, as above.
-- Replacing the outer list with `setFieldArrayValue` or `setValue` doesn't fill in the nested lists. To load new nested data, use `resetInitialValues` instead (see [Loading and Saving Data](/docs/guides/loading-and-saving)).
-- The `fieldNames` option accepts `{ name, type: 'field-array', fieldNames }` entries for nested lists. Leave them out for now: with them, initial values don't reach the nested rows.
+```ts
+append({ title: 'New section', lessons: [{ title: 'Intro', minutes: 5 }] });
+update(0, { title: 'Renamed', lessons: [] });
+setFieldArrayValue(sectionsFromServer);
+```
+
+Without the declaration, a new row's nested list starts empty, or with its `defaultValue` rows.
 
 See it running in the [Nested Arrays example](/docs/examples/field-arrays/nested-arrays).
 

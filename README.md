@@ -5,11 +5,13 @@ Fast React forms where every field is a [Jotai](https://jotai.org) atom.
 Each field keeps its state in its own atom, so typing in one field re-renders only that field, not the whole form. That keeps large forms, long tables and dynamic field arrays fast without any memoization on your side.
 
 - **Field-level state:** `useField` subscribes a component to a single field.
-- **Field arrays:** add, insert and remove rows, including nested arrays. Only the cells that change re-render.
-- **Validation:** per field, per field array and form-wide, as values change and on submit.
+- **Field arrays:** add, insert, move, swap and remove rows, including nested arrays. Only the cells that change re-render.
+- **Validation:** per field, per field array and form-wide, with plain functions or any [Standard Schema](https://standardschema.dev) (Zod, Valibot, ArkType, Yup 1.7+). Sync or async, with debouncing.
 - **Live values without re-renders:** watch specific fields, a column of a field array, or the whole form from any component.
-- **Dirty tracking, initial values, resets and async submit** built in.
-- **TypeScript** types included, ESM-only, about 7 kB gzipped.
+- **Form state:** `isValid`, `isDirty`, `isSubmitting`, `submitCount` and more. Components re-render only for the flags they read.
+- **Type-safe field names:** `createFormHooks<Values>()` checks every name and types every value, including fields in field array rows.
+- **Initial values, resets, server errors and focus on the first invalid field** built in.
+- **TypeScript** types included, ESM-only, about 10 kB gzipped.
 
 ## Contents
 
@@ -17,6 +19,7 @@ Each field keeps its state in its own atom, so typing in one field re-renders on
 - [Quick start](#quick-start)
 - [Core concepts](#core-concepts)
 - [Validation](#validation)
+- [Type-safe forms](#type-safe-forms)
 - [Field arrays](#field-arrays)
 - [Watching values](#watching-values)
 - [Working with the form from anywhere](#working-with-the-form-from-anywhere)
@@ -120,7 +123,7 @@ setFieldValue(option.value, { label: option.label });
 
 ### Touched state
 
-A field's `error` is only returned once the field is touched, meaning its `onBlur` has run or the form has been validated on submit. Validation itself runs on every change.
+A field's `error` is only returned once the field is touched, meaning its `onBlur` has run or the form has been validated on submit. Validation itself runs on every change. To show errors as the user types, or only after the first submit, set `useForm({ mode: 'onChange' })` or `mode: 'onSubmit'`.
 
 ### Unmounted fields
 
@@ -182,22 +185,108 @@ useForm({
 });
 ```
 
-`useSetFormProps()` returns a setter that replaces the form-level `validate` from any component inside the form: `setFormProps({ validate })`.
+The form-level errors are also kept in `formState.formErrors` until the next submit. `useSetFormProps()` returns a setter that replaces the form-level `validate` from any component inside the form: `setFormProps({ validate })`.
+
+### Async validation
+
+Any validator can be `async`. `isValidating` is `true` while it runs, `debounceValidation` waits for typing to pause, and results of outdated checks are ignored. A validator that throws or rejects becomes an error, so a failed request can't let invalid data through:
+
+```tsx
+const { isValidating, error } = useField({
+  name: 'username',
+  validate: async (value) =>
+    value && (await api.isTaken(value)) ? 'This username is taken' : null,
+  debounceValidation: 400,
+});
+```
+
+`handleSubmit` waits for pending async validators (with `formState.isValidating` set) before calling `onSubmit` or `onError`. Without async validators, submitting stays synchronous.
+
+### Schema validation
+
+Pass any [Standard Schema](https://standardschema.dev) (Zod, Valibot, ArkType, Effect Schema, Yup 1.7+) as `schema`. No adapter needed:
+
+```tsx
+import { z } from 'zod';
+
+const schema = z.object({
+  name: z.string().min(1, 'Required'),
+  items: z.array(z.object({ qty: z.number().min(1) })).min(1, 'Add an item'),
+});
+
+useForm({ schema, onSubmit });
+```
+
+Each issue goes to the field at its path: `items[1].qty` lands on the `qty` field of the second row, and `items` on the field array. Issues without a field become form errors (`formState.formErrors`). The schema re-runs as values change. `useField` and `useFieldArray` also accept a `schema` for a single field or list.
+
+### Errors from the server
+
+```tsx
+const { setError, setFormErrors } = useForm({
+  onSubmit: async (values) => {
+    const result = await api.save(values);
+    if (result.emailTaken) {
+      setError('email', 'This email is already registered');
+      return false; // keep the edits
+    }
+  },
+});
+```
+
+`clearErrors()` clears them. Attach `useField`'s `ref` to an input and the first invalid field is focused when a submit fails.
 
 ### Validating on demand
 
 ```tsx
-const { validateFields, validateAllFields } = useForm({ onSubmit });
+const { validateFields, validateFieldsAsync, validateAllFields } = useForm({
+  onSubmit,
+});
 
 // Validate only some fields, e.g. the current step of a wizard
 const errors = validateFields(['email', 'password']);
 if (!errors.length) goToNextStep();
+
+// The same, waiting for async validators
+const asyncErrors = await validateFieldsAsync(['username']);
 
 // Validate everything without submitting
 const allErrors = validateAllFields();
 ```
 
 Fields that fail validation are marked as touched so their errors show.
+
+### Form state
+
+```tsx
+const { formState } = useForm({ onSubmit });
+// or, in any component inside the form:
+const { isValid, isSubmitting } = useFormState();
+```
+
+`formState` has `isSubmitting`, `isSubmitted`, `isSubmitSuccessful`, `submitCount`, `isValidating`, `isValid`, `isDirty`, `errors` and `formErrors`. A component re-renders only when a property it reads changes.
+
+## Type-safe forms
+
+`createFormHooks<Values>()` returns the same hooks, typed for your values. Names are checked and values are typed by path:
+
+```tsx
+import { createFormHooks } from 'wit-form';
+
+interface Order {
+  customer: { name: string };
+  items: { product: string; qty: number }[];
+}
+
+const { useForm, useField, useFieldArray } = createFormHooks<Order>();
+
+const name = useField({ name: 'customer.name' }); // fieldValue: string | undefined
+useField({ name: 'customer.nmae' }); // ❌ compile error
+
+// Fields in rows are checked against the row type
+const qty = useField({ name: 'qty', ancestors: [{ name: 'items', rowId }] }); // number | undefined
+```
+
+At runtime these are the regular hooks. `FieldPath`, `ArrayPath` and `PathValue` are exported for your own components.
 
 ## Field arrays
 
@@ -364,7 +453,10 @@ resetInitialValues(record);
 | `onSubmit`                | `(values, extraInfos) => any`               | Called with the values when validation passes. If it returns a promise, `formState.isSubmitting` is `true` until it settles. |
 | `onError`                 | `(fieldErrors, formErrors, values) => any`  | Called instead of `onSubmit` when validation fails.                                                                          |
 | `initialValues`           | `object`                                    | Initial form values.                                                                                                         |
-| `validate`                | `(values) => string[] \| null \| undefined` | Form-level validation, run on submit.                                                                                        |
+| `validate`                | `(values) => string[] \| null \| undefined` | Form-level validation, run on submit. Can be async.                                                                          |
+| `schema`                  | `StandardSchemaV1`                          | A schema for all values. Issues are shown on the matching fields.                                                            |
+| `mode`                    | `'onTouched' \| 'onChange' \| 'onSubmit'`   | When field errors become visible. Default `'onTouched'`.                                                                     |
+| `shouldFocusError`        | `boolean`                                   | Focus the first invalid field (with its `ref` attached) when a submit fails. Default `true`.                                 |
 | `skipUnregister`          | `boolean`                                   | Keep the values of fields that unmount. Default `false`.                                                                     |
 | `reinitializeOnSubmit`    | `boolean`                                   | After a successful submit, reset the form to `initialValues` (e.g. to clear a change-password form).                         |
 | `skipUnusedInitialValues` | `boolean`                                   | Leave initial values that don't belong to a rendered field out of the submitted values.                                      |
@@ -373,29 +465,34 @@ After a successful submit, the submitted values become the new initial values, s
 
 Returns:
 
-| Property                                   | Description                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------ |
-| `handleSubmit(event?)`                     | Validates and submits. Pass it to `<form onSubmit>` or call it directly. |
-| `formState`                                | `{ isSubmitting: boolean }`                                              |
-| `handleReset()`                            | Resets all fields back to the initial values.                            |
-| `resetInitialValues(values?, extraInfos?)` | Replaces the initial values and resets all fields to them.               |
-| `validateFields(names)`                    | Validates the given fields or field arrays and returns the errors.       |
-| `validateAllFields()`                      | Validates every field and returns the errors.                            |
-| `getValues()`                              | Returns `{ values, extraInfos }`.                                        |
+| Property                                                                      | Description                                                                                                                      |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `handleSubmit(event?)`                                                        | Validates and submits. Pass it to `<form onSubmit>` or call it directly.                                                         |
+| `formState`                                                                   | `isSubmitting`, `isSubmitted`, `isSubmitSuccessful`, `submitCount`, `isValidating`, `isValid`, `isDirty`, `errors`, `formErrors` |
+| `handleReset()`                                                               | Resets all fields back to the initial values.                                                                                    |
+| `resetInitialValues(values?, extraInfos?)`                                    | Replaces the initial values and resets all fields to them.                                                                       |
+| `validateFields(names)`                                                       | Validates the given fields or field arrays and returns the errors.                                                               |
+| `validateAllFields()`                                                         | Validates every field and returns the errors.                                                                                    |
+| `validateFieldsAsync` / `validateAllFieldsAsync`                              | The same, waiting for async validators.                                                                                          |
+| `setError(name, message)` / `clearErrors(names?)` / `setFormErrors(messages)` | Show or clear errors, e.g. from your server.                                                                                     |
+| `setFocus(name)`                                                              | Focuses a field whose `ref` is attached.                                                                                         |
+| `getValues()`                                                                 | Returns `{ values, extraInfos }`.                                                                                                |
 
 ### `useField<Value, ExtraInfo>(options)`
 
-| Option             | Type                                            | Description                                                        |
-| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------ |
-| `name`             | `string`                                        | Field path.                                                        |
-| `ancestors`        | `{ name: string; rowId: number }[]`             | Required for fields inside field arrays, outermost array first.    |
-| `defaultValue`     | `Value`                                         | Used when there is no initial value.                               |
-| `validate`         | `(value, other) => string \| null \| undefined` | Validator, read once when the field mounts.                        |
-| `validateCallback` | same as `validate`                              | Memoized validator that may change over time.                      |
-| `depFields`        | `(string \| { name, ancestors })[]`             | Fields whose values are passed to the validator as `other.values`. |
-| `skipUnregister`   | `boolean`                                       | Keep the value when this field unmounts.                           |
+| Option               | Type                                            | Description                                                        |
+| -------------------- | ----------------------------------------------- | ------------------------------------------------------------------ |
+| `name`               | `string`                                        | Field path.                                                        |
+| `ancestors`          | `{ name: string; rowId: number }[]`             | Required for fields inside field arrays, outermost array first.    |
+| `defaultValue`       | `Value`                                         | Used when there is no initial value.                               |
+| `validate`           | `(value, other) => string \| null \| undefined` | Validator, read once when the field mounts. Can be async.          |
+| `schema`             | `StandardSchemaV1`                              | A schema for this value. Runs before `validate`.                   |
+| `debounceValidation` | `number`                                        | Milliseconds to wait after the last change before validating.      |
+| `validateCallback`   | same as `validate`                              | Memoized validator that may change over time.                      |
+| `depFields`          | `(string \| { name, ancestors })[]`             | Fields whose values are passed to the validator as `other.values`. |
+| `skipUnregister`     | `boolean`                                       | Keep the value when this field unmounts.                           |
 
-Returns `{ fieldValue, setFieldValue(value, extraInfo?), extraInfo, error, touched, onBlur }`. `error` is only set once the field is touched.
+Returns `{ fieldValue, setFieldValue(value, extraInfo?), extraInfo, error, touched, onBlur, isValidating, isDirty, ref }`. `error` is only set once the field is touched (or as `mode` says). Attach `ref` to the input so a failed submit can focus it.
 
 ### `useFieldArray(options)`
 
@@ -404,28 +501,33 @@ Returns `{ fieldValue, setFieldValue(value, extraInfo?), extraInfo, error, touch
 | `name`           | `string`                                    | Field array path.                                                                              |
 | `fieldNames`     | `(string \| { name, type, fieldNames? })[]` | The fields in each row. Strings are plain fields; use `type: 'field-array'` for nested arrays. |
 | `ancestors`      | `{ name: string; rowId: number }[]`         | Required for nested field arrays.                                                              |
-| `validate`       | `(rows) => string \| null \| undefined`     | Validator for the whole array. Define it outside the component or memoize it.                  |
+| `validate`       | `(rows) => string \| null \| undefined`     | Validator for the whole array. Can be async. Define it outside the component or memoize it.    |
+| `schema`         | `StandardSchemaV1`                          | A schema for the rows, e.g. `z.array(...).min(1)`.                                             |
 | `defaultValue`   | `object[]`                                  | Rows used when there is no initial value.                                                      |
 | `skipUnregister` | `boolean`                                   | Keep the rows when this field array unmounts.                                                  |
 
 Returns:
 
-| Property                   | Description                                           |
-| -------------------------- | ----------------------------------------------------- |
-| `fieldArrayProps.rowIds`   | Row ids in display order. Render one row per id.      |
-| `append(...rows)`          | Adds rows at the end.                                 |
-| `insert(index, ...rows)`   | Inserts rows at `index`.                              |
-| `remove(index)`            | Removes the row at `index`.                           |
-| `clear(index)`             | Clears the values of the row at `index`.              |
-| `removeAll()`              | Removes every row.                                    |
-| `getFieldArrayValue()`     | Returns the current rows.                             |
-| `setFieldArrayValue(rows)` | Replaces all rows.                                    |
-| `validateData()`           | Validates the rows and returns `{ errors, isValid }`. |
-| `error`                    | Error from the array's `validate`.                    |
+| Property                                     | Description                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `fieldArrayProps.rowIds`                     | Row ids in display order. Render one row per id.                                                        |
+| `append(...rows)`                            | Adds rows at the end.                                                                                   |
+| `prepend(...rows)`                           | Adds rows at the start.                                                                                 |
+| `insert(index, ...rows)`                     | Inserts rows at `index`.                                                                                |
+| `update(index, row)`                         | Replaces a row's values, keeping its id.                                                                |
+| `swap(a, b)` / `move(from, to)`              | Reorders rows. Rows keep their ids and state.                                                           |
+| `remove(index)`                              | Removes the row at `index`, or `remove([i, j])` several rows.                                           |
+| `clear(index)`                               | Clears the values of the row at `index`.                                                                |
+| `removeAll()`                                | Removes every row.                                                                                      |
+| `getFieldArrayValue()`                       | Returns the current rows.                                                                               |
+| `setFieldArrayValue(rows)` / `replace(rows)` | Replaces all rows.                                                                                      |
+| `validateData()`                             | Validates the rows and returns `{ errors, isValid }`. `validateDataAsync()` waits for async validators. |
+| `error`                                      | Error from the array's `validate` or `schema`, or the form schema.                                      |
+| `isValidating`                               | The array's async validator is running.                                                                 |
 
 ### `useFormContext()`
 
-Returns `{ setValue, getValue, setFieldValues, getValues, getValuesAndExtraInfo, checkIsDirty, removeFields, resetInitialValues, validateAllFields }`.
+Returns `{ setValue, getValue, setFieldValues, getValues, getValuesAndExtraInfo, checkIsDirty, removeFields, resetInitialValues, validateAllFields, validateAllFieldsAsync, setError, clearErrors, setFormErrors, setFocus }`.
 
 - `setValue(name | { name, type, ancestors }, { value?, extraInfo? })` sets a field or a whole field array.
 - `getValue({ name, type, ancestors? })` returns `{ value, extraInfo }`.

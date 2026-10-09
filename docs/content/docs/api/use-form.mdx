@@ -1,13 +1,15 @@
 ---
 title: 'useForm'
-description: 'useForm controls the form as a whole: what happens on submit, the initial values, form-level validation, and resetting. Call it once per form, in a component inside the FormProvider.'
+description: 'useForm controls the form as a whole: what happens on submit, the initial values, form-level validation and schemas, the form state, and resetting. Call it once per form, in a component inside the FormProvider.'
 ---
 
 ```ts
 import { useForm } from 'wit-form';
 
-const form = useForm(options);
+const form = useForm<Values>(options);
 ```
+
+The optional `Values` type types `initialValues`, `onSubmit`, `onError` and `validate`. To also check field names, use [`createFormHooks`](/docs/api/create-form-hooks).
 
 ```tsx
 function SignupForm() {
@@ -32,7 +34,7 @@ function SignupForm() {
 
 ### `onSubmit`
 
-**Type:** `(values: any, extraInfos?: any) => any` · **Required**
+**Type:** `(values: Values, extraInfos?: any) => any` · **Required**
 
 Called by `handleSubmit` when every validation passes.
 
@@ -46,15 +48,20 @@ If it returns a promise:
 - If it **resolves to `false`**, the initial values are left unchanged. Use this when a save fails and you want to keep the user's edits.
 - If it **rejects**, `isSubmitting` goes back to `false` and the error is ignored. Catch errors yourself to show them.
 
+`formState.isSubmitSuccessful` is `true` afterwards unless it resolved to `false` or rejected.
+
 ```tsx
-onSubmit: async (values) => {
-  try {
-    await api.save(values);
-  } catch {
-    setError('Could not save');
-    return false;
-  }
-};
+const { setError, setFormErrors } = useForm({
+  onSubmit: async (values) => {
+    try {
+      await api.save(values);
+    } catch (err) {
+      if (err.field) setError(err.field, err.message);
+      else setFormErrors(['Could not save']);
+      return false;
+    }
+  },
+});
 ```
 
 If it doesn't return a promise, the submitted values become the new initial values right away.
@@ -65,11 +72,11 @@ If it doesn't return a promise, the submitted values become the new initial valu
 
 Called **instead of** `onSubmit` when validation fails on submit.
 
-| Argument      | Type                            | Description                                            |
-| ------------- | ------------------------------- | ------------------------------------------------------ |
-| `fieldErrors` | `IFieldError[]`                 | One entry per failing field or field array. See below. |
-| `formErrors`  | `string[] \| null \| undefined` | What the form-level `validate` returned.               |
-| `values`      | `any`                           | The values that failed validation.                     |
+| Argument      | Type            | Description                                                                                    |
+| ------------- | --------------- | ---------------------------------------------------------------------------------------------- |
+| `fieldErrors` | `IFieldError[]` | One entry per failing field or field array. See below.                                         |
+| `formErrors`  | `string[]`      | What the form-level `validate` returned, plus form schema issues that don't belong to a field. |
+| `values`      | `any`           | The values that failed validation.                                                             |
 
 Each `IFieldError` looks like:
 
@@ -89,11 +96,11 @@ By default, initial values for fields you never render are still included in the
 
 ### `validate`
 
-**Type:** `(values: any) => string[] | null | undefined` · **Default:** none
+**Type:** `(values: Values) => string[] | null | undefined | Promise<...>` · **Default:** none
 
-Form-level validation for rules that span several fields. Receives all values and returns a list of error messages. An empty list, `null` or `undefined` means valid.
+Form-level validation for rules that span several fields. Receives all values and returns a list of error messages. An empty list, `null` or `undefined` means valid. It can be `async`.
 
-Runs **only on submit**, after field validation. The messages are passed to `onError` as `formErrors`. Show them yourself, for example in a banner.
+Runs **only on submit**, after field validation. The messages are passed to `onError` as `formErrors`, and kept in `formState.formErrors` until the next submit.
 
 ```tsx
 validate: (values) =>
@@ -101,6 +108,42 @@ validate: (values) =>
 ```
 
 A child component can replace this function with [useSetFormProps](/docs/api/use-set-form-props).
+
+### `schema`
+
+**Type:** `StandardSchemaV1` · **Default:** none
+
+A schema for all the form values, from any [Standard Schema](https://standardschema.dev) library: Zod, Valibot, ArkType, Effect Schema, Yup 1.7+ and others.
+
+```tsx
+useForm({
+  schema: z.object({ email: z.email(), age: z.number().min(18) }),
+  onSubmit,
+});
+```
+
+- Each issue goes to the field at its path, including fields in field array rows (`items[1].qty`), or to the field array itself (`items`).
+- Issues without a matching field become form errors (`formState.formErrors`, and `formErrors` in `onError`).
+- The schema runs whenever a value changes, and on submit. Async schemas work too.
+- `onSubmit` receives the form's values, not the schema's parsed output.
+
+Define it outside your component. See [Schema validation](/docs/guides/validation#schema-validation).
+
+### `mode`
+
+**Type:** `'onTouched' | 'onChange' | 'onSubmit'` · **Default:** `'onTouched'`
+
+When field errors become visible. Validation runs on every change in all modes.
+
+- `'onTouched'`: after the field is blurred, or after a submit.
+- `'onChange'`: as soon as the user changes the field.
+- `'onSubmit'`: only after the first submit (or a `validateFields` call).
+
+### `shouldFocusError`
+
+**Type:** `boolean` · **Default:** `true`
+
+When a submit fails, focus the first invalid field on the page. Only fields whose [`ref`](/docs/api/use-field#ref) is attached to an element can be focused.
 
 ### `skipUnregister`
 
@@ -132,13 +175,31 @@ Use it when `initialValues` is a big record from your API and you only want to s
 
 Validates the form and, if valid, calls `onSubmit`. Pass it to `<form onSubmit>`. It calls `preventDefault()` and `stopPropagation()` on the event, so the page doesn't reload. You can also call it without an event, for example from a button's `onClick`.
 
-Returns whatever `onSubmit` returned, so you can `await` it. Returns `undefined` if validation failed.
+Returns whatever `onSubmit` returned, so you can `await` it. Returns `undefined` if validation failed. If any validator is async, it returns a promise that settles once validation and `onSubmit` are done.
 
 ### `formState`
 
-**Type:** `{ isSubmitting: boolean }`
+**Type:** `IFormState`
 
-`isSubmitting` is `true` while an async `onSubmit` is running. Use it to disable the submit button or show a spinner.
+The form's state. Reading a property subscribes the component to it, and the component re-renders only when a property it read changes.
+
+| Property             | Type            | Description                                                                                          |
+| -------------------- | --------------- | ---------------------------------------------------------------------------------------------------- |
+| `isSubmitting`       | `boolean`       | `onSubmit` is running.                                                                               |
+| `isSubmitted`        | `boolean`       | The form has been submitted at least once, whether or not it was valid.                              |
+| `isSubmitSuccessful` | `boolean`       | The last submit passed validation and `onSubmit` didn't resolve to `false` or reject.                |
+| `submitCount`        | `number`        | How many times the form has been submitted.                                                          |
+| `isValidating`       | `boolean`       | An async validator is running, for a field, a field array or a submit.                               |
+| `isValid`            | `boolean`       | No field or field array has an error, and the form schema passes.                                    |
+| `isDirty`            | `boolean`       | The values differ from the initial values. Same as [`useIsDirty`](/docs/api/watch-hooks#useisdirty). |
+| `errors`             | `IFieldError[]` | Every current field and field array error, including ones not shown yet.                             |
+| `formErrors`         | `string[]`      | Form-level errors from the last submit, or set with `setFormErrors`.                                 |
+
+```tsx
+<button disabled={formState.isSubmitting || !formState.isValid}>Save</button>
+```
+
+Other components can read the same state with [`useFormState`](/docs/api/use-form-state).
 
 ### `handleReset`
 
@@ -162,7 +223,9 @@ useEffect(() => {
 
 **Type:** `(names: (string | IFormContextFieldInput)[]) => IFieldError[]`
 
-Validates only the given fields or field arrays and returns their errors. An empty array means they're all valid. Failing fields are marked as touched so their errors show.
+Validates only the given fields or field arrays and returns their errors. An empty array means they're all valid. Failing fields are marked as touched so their errors show. Form schema issues for those fields are included.
+
+Only sync validators are included in the result. Async validators start, and their errors show when they finish. To wait for them, use `validateFieldsAsync`.
 
 - A string is a top-level field name, or a top-level field array name.
 - For a field inside a row, pass `{ name, type: 'field', ancestors }`.
@@ -175,11 +238,55 @@ const next = () => {
 };
 ```
 
+### `validateFieldsAsync`
+
+**Type:** `(names: (string | IFormContextFieldInput)[]) => Promise<IFieldError[]>`
+
+Like `validateFields`, but waits for async validators and returns all errors.
+
 ### `validateAllFields`
 
 **Type:** `() => IFieldError[]`
 
-Validates every mounted field and field array, without submitting, and returns the errors. Failing fields are marked as touched. The form-level `validate` doesn't run.
+Validates every mounted field and field array, and the form schema, without submitting, and returns the errors. Failing fields are marked as touched. The form-level `validate` doesn't run. Like `validateFields`, only sync results are returned.
+
+### `validateAllFieldsAsync`
+
+**Type:** `() => Promise<IFieldError[]>`
+
+Like `validateAllFields`, but waits for async validators.
+
+### `setError`
+
+**Type:** `(key: string | IFormContextFieldInput, message: string) => void`
+
+Shows an error on a field (or field array) right away, for example one returned by your server. It stays until the field validates again, which happens when its value changes. See [Errors from the server](/docs/guides/validation#errors-from-the-server).
+
+```ts
+setError('email', 'This email is already registered');
+setError(
+  { name: 'qty', type: 'field', ancestors: [{ name: 'items', rowId }] },
+  'Out of stock'
+);
+```
+
+### `clearErrors`
+
+**Type:** `(keys?: (string | IFormContextFieldInput)[]) => void`
+
+Clears the errors of the given fields. Without arguments, clears every field error and the form errors.
+
+### `setFormErrors`
+
+**Type:** `(messages: string[]) => void`
+
+Sets `formState.formErrors`, for errors that don't belong to a field.
+
+### `setFocus`
+
+**Type:** `(key: string | IFormContextFieldInput) => void`
+
+Focuses a field whose [`ref`](/docs/api/use-field#ref) is attached.
 
 ### `getValues`
 
@@ -190,4 +297,4 @@ Returns the current values and extra infos. It reads them once and doesn't subsc
 ## Notes
 
 - When the component that called `useForm` unmounts, the form's fields are reset.
-- `useForm` itself doesn't re-render when field values change. It only re-renders when `formState` changes.
+- `useForm` itself doesn't re-render when field values change. It only re-renders when a `formState` property it read changes.

@@ -1,0 +1,123 @@
+---
+title: 'Type-safe forms'
+description: 'createFormHooks gives you the Wit Form hooks typed for your form values: TypeScript checks every field name, including fields inside field array rows, and types each value by its path.'
+---
+
+## Typed hooks for a form
+
+Describe the form's values with a type, then create the hooks for it once, outside your components:
+
+```ts
+import { createFormHooks } from 'wit-form';
+
+interface Order {
+  customer: { name: string; email?: string };
+  items: { product: string; qty: number }[];
+}
+
+export const { useForm, useField, useFieldArray, Field } =
+  createFormHooks<Order>();
+```
+
+Use them exactly like the regular hooks:
+
+```tsx
+function OrderForm() {
+  const { handleSubmit } = useForm({
+    initialValues: { customer: { name: '' } },
+    onSubmit: (values) => {
+      values.items; // { product: string; qty: number }[]
+    },
+  });
+  const name = useField({ name: 'customer.name' });
+  name.fieldValue; // string | undefined
+
+  useField({ name: 'customer.nmae' });
+  //                ~~~~~~~~~~~~~~ Error: not a field of Order
+  // ...
+}
+```
+
+At runtime these are the same functions Wit Form exports, so typed and untyped hooks work together in one form, and there's no extra cost.
+
+## What's checked
+
+| Where                                                            | Checked against                                               |
+| ---------------------------------------------------------------- | ------------------------------------------------------------- |
+| `useField`, `<Field>`: `name`                                    | every path of your values, like `customer` or `customer.name` |
+| `useField`: `fieldValue`, `setFieldValue`, validators            | the type at that path                                         |
+| `useForm`: `initialValues`                                       | a deep partial of your values                                 |
+| `useForm`: `onSubmit`, `onError`, `validate`                     | receive your values type                                      |
+| `useFieldArray`: `name`                                          | paths that hold an array of objects, like `items`             |
+| `useFieldArray`: `fieldNames`, `append`, `insert`, `update`, ... | the row type                                                  |
+| `useFieldArrayColumnWatch`: `fieldArrayName`, `fieldNames`       | array paths and the row's fields                              |
+| `useFieldWatch`, `useFormValues`, `getValues`                    | return a deep partial of your values                          |
+| `useFormContext`: `setValue(name, ...)`                          | the name, and the value's type                                |
+
+## Fields in field array rows
+
+A field inside a row has a plain name, like `qty`, plus `ancestors`. The typed hooks follow the ancestors to the row type, so `qty` is checked against the fields of an `items` row:
+
+```tsx
+function ItemRow(props: { rowId: number }) {
+  const qty = useField({
+    name: 'qty',
+    ancestors: [{ name: 'items', rowId: props.rowId }],
+  });
+  qty.fieldValue; // number | undefined
+}
+```
+
+This needs TypeScript to see the ancestor names as literal types. Writing the array inline, as above, works. If you build it in a variable or with `useMemo`, add `as const`:
+
+```tsx
+const ancestors = useMemo(
+  () => [{ name: 'items', rowId: props.rowId }] as const,
+  [props.rowId]
+);
+useField({ name: 'qty', ancestors });
+```
+
+When the names are plain `string`s, for example ancestors passed down as `IAncestorInput[]` props, the row type falls back to `any`: names inside the row aren't checked, but nothing breaks.
+
+Nested lists work the same way, with each list listed outermost first:
+
+```tsx
+useField({
+  name: 'title',
+  ancestors: [
+    { name: 'sections', rowId: sectionRowId },
+    { name: 'lessons', rowId: lessonRowId },
+  ],
+});
+```
+
+## Path types
+
+The types behind the hooks are exported for your own components:
+
+```ts
+import type { FieldPath, ArrayPath, PathValue } from 'wit-form';
+
+type OrderField = FieldPath<Order>; // 'customer' | 'customer.name' | 'customer.email' | 'items'
+type OrderList = ArrayPath<Order>; // 'items'
+type Email = PathValue<Order, 'customer.email'>; // string | undefined
+```
+
+For example, a reusable input can accept only valid names:
+
+```tsx
+function OrderTextField(props: { name: FieldPath<Order> }) {
+  const { fieldValue, setFieldValue } = useField({ name: props.name });
+  // ...
+}
+```
+
+## Without createFormHooks
+
+The regular hooks stay available. `useField<Value>` types the value of a single field without checking its name, and `useForm<Values>` types `onSubmit`, `onError` and `validate`:
+
+```ts
+useForm<Order>({ onSubmit: (values) => save(values) });
+useField<string>({ name: 'customer.name' });
+```

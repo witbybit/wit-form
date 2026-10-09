@@ -145,7 +145,7 @@ export async function CodeShowcase() {
       <Container className="flex flex-col gap-12">
         <SectionHeading
           eyebrow="The API"
-          title="A handful of hooks. No schema DSL, no magic."
+          title="A handful of hooks. Plain functions or your schema, no magic."
           description="Wit Form manages state and validation. You keep full control of markup, styling and accessibility."
         />
         <CodeTabs

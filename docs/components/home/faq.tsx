@@ -49,10 +49,14 @@ const questions: { q: string; a: ReactNode }[] = [
     q: 'Can I use Zod, Yup or another validation library?',
     a: (
       <>
-        Yes, inside a validator. A validator is a function that returns an error
-        message, or <Code>null</Code> when the value is fine, so you can call
-        any library from it. See the{' '}
-        <DocLink href="/docs/guides/validation">validation guide</DocLink>.
+        Yes. Pass any Standard Schema (Zod, Valibot, ArkType, Effect Schema, Yup
+        1.7+) as <Code>schema</Code>, for a field, a list or the whole form,
+        with no adapter to install. Errors land on the matching fields. You can
+        also call any library from a plain validator. See{' '}
+        <DocLink href="/docs/guides/validation#schema-validation">
+          schema validation
+        </DocLink>
+        .
       </>
     ),
   },

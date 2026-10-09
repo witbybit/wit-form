@@ -4,6 +4,8 @@
     "field-rules",
     "cross-field-rules",
     "dynamic-rules",
+    "async-rules",
+    "schema-rules",
     "form-level-rules"
   ]
 }

@@ -1,0 +1,57 @@
+---
+title: 'createFormHooks'
+description: 'createFormHooks returns the Wit Form hooks typed for your form values, so TypeScript checks field names and infers value types from them.'
+---
+
+```ts
+import { createFormHooks } from 'wit-form';
+
+const hooks = createFormHooks<Values>();
+```
+
+Call it once per form type, outside your components, and use the returned hooks instead of the plain ones:
+
+```tsx
+interface Profile {
+  name: string;
+  address: { city: string };
+  phones: { label: string; number: string }[];
+}
+
+const { useForm, useField, useFieldArray, Field } = createFormHooks<Profile>();
+
+function CityField() {
+  const city = useField({ name: 'address.city' }); // name is checked
+  city.fieldValue; // string | undefined
+  // ...
+}
+```
+
+Read the [Type-safe forms guide](/docs/guides/type-safety) for fields in field array rows and other details.
+
+## Returns
+
+The same hooks and component Wit Form exports, with stricter types. At runtime they're the very same functions.
+
+| Returned                   | Typed as                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useForm`                  | [`useForm`](/docs/api/use-form) with `Values` for `initialValues`, `onSubmit`, `onError`, `validate`.                                       |
+| `useField`                 | [`useField`](/docs/api/use-field): `name` must be a path of `Values` (or of the row, with `ancestors`). The value type comes from the path. |
+| `useFieldArray`            | [`useFieldArray`](/docs/api/use-field-array): `name` must hold an array of objects. Row functions take the row type.                        |
+| `useFieldWatch`            | [`useFieldWatch`](/docs/api/watch-hooks#usefieldwatch): checked names, typed values.                                                        |
+| `useFieldArrayColumnWatch` | [`useFieldArrayColumnWatch`](/docs/api/watch-hooks#usefieldarraycolumnwatch): checked array and column names, typed rows.                   |
+| `useFormValues`            | [`useFormValues`](/docs/api/watch-hooks#useformvalues), returning `DeepPartial<Values>`.                                                    |
+| `useFormContext`           | [`useFormContext`](/docs/api/use-form-context), with a typed `setValue(name, ...)` and `getValues()`.                                       |
+| `useFormState`             | [`useFormState`](/docs/api/use-form-state).                                                                                                 |
+| `Field`                    | [`<Field>`](/docs/api/field) with a checked `name`.                                                                                         |
+
+## Path types
+
+The types used by the hooks are exported too:
+
+| Type              | Description                                                                 |
+| ----------------- | --------------------------------------------------------------------------- |
+| `FieldPath<T>`    | Every field name of `T`, like `'name' \| 'address' \| 'address.city'`.      |
+| `ArrayPath<T>`    | Every path of `T` that holds an array of objects, like `'phones'`.          |
+| `PathValue<T, P>` | The type at path `P`, like `PathValue<Profile, 'address.city'>` → `string`. |
+| `DeepPartial<T>`  | `T` with every property optional, at every level.                           |
