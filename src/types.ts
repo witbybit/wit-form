@@ -39,6 +39,8 @@ export interface IFieldArrayAtomValue extends IAtomValueBase {
   rowIds: number[];
   fieldNames: IChildFieldInfo[];
   skipUnregister?: boolean;
+  /** Rows created from the initial values. Nested lists only read initial values inside these rows. */
+  initialRowIds?: number[];
 }
 
 export interface InitialValues {

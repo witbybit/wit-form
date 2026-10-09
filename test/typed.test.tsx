@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { useMemo } from 'react';
 import {
   createFormHooks,
   FormProvider,
+  type IAncestorInput,
   type ArrayPath,
   type FieldPath,
   type PathValue,
@@ -59,6 +61,29 @@ describe('createFormHooks', () => {
       expectTypeOf(price.fieldValue).toEqualTypeOf<number | undefined>();
       return null;
     }
+
+    // Ancestors built with useMemo need `as const` to keep their literal names
+    function MemoItem(props: { rowId: number }) {
+      const ancestors = useMemo(
+        () => [{ name: 'items', rowId: props.rowId }] as const,
+        [props.rowId]
+      );
+      const product = useField({ name: 'product', ancestors });
+      expectTypeOf(product.fieldValue).toEqualTypeOf<string | undefined>();
+      return null;
+    }
+    void MemoItem;
+
+    // With plain string names, the row falls back to any instead of failing
+    function LooseItem(props: { ancestors: IAncestorInput[] }) {
+      const anything = useField({
+        name: 'whatever',
+        ancestors: props.ancestors,
+      });
+      expectTypeOf(anything.fieldValue).toBeAny();
+      return null;
+    }
+    void LooseItem;
 
     function Item(props: { rowId: number }) {
       const qty = useField({

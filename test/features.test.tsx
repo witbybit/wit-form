@@ -717,3 +717,128 @@ describe('field array operations', () => {
     expect(names()).toEqual(['x', 'y']);
   });
 });
+
+describe('field array schema errors', () => {
+  it('returns the form schema error of a field array as its error', async () => {
+    let fa: any;
+    function Form() {
+      useForm({
+        schema: z.object({ items: z.array(z.any()).min(1, 'Add an item') }),
+        onSubmit: () => undefined,
+      });
+      fa = useFieldArray({ name: 'items', fieldNames: ['name'] });
+      return null;
+    }
+    await render(
+      <FormProvider>
+        <Form />
+      </FormProvider>
+    );
+    expect(fa.error).toBe('Add an item');
+    await run(() => fa.append({ name: 'a' }));
+    expect(fa.error).toBeUndefined();
+  });
+});
+
+describe('nested field arrays', () => {
+  it('fills nested rows of new rows from data, or from the nested defaultValue', async () => {
+    let fa: any;
+    let ctx: any;
+    function Lessons(props: { rowId: number }) {
+      const ancestors = useMemo(
+        () => [{ name: 'sections', rowId: props.rowId }],
+        [props.rowId]
+      );
+      const lessons = useFieldArray({
+        name: 'lessons',
+        fieldNames: ['title'],
+        ancestors,
+        defaultValue: [{ title: 'Default lesson' }],
+      });
+      return (
+        <>
+          {lessons.fieldArrayProps.rowIds.map((rowId) => (
+            <Input
+              key={rowId}
+              name="title"
+              ancestors={[...ancestors, { name: 'lessons', rowId }]}
+              api={{}}
+            />
+          ))}
+        </>
+      );
+    }
+    function Form() {
+      useForm({
+        initialValues: {
+          sections: [{ title: 'Old', lessons: [{ title: 'Old lesson' }] }],
+        },
+        onSubmit: () => undefined,
+      });
+      ctx = useFormContext();
+      fa = useFieldArray({
+        name: 'sections',
+        fieldNames: [
+          'title',
+          { name: 'lessons', type: 'field-array', fieldNames: ['title'] },
+        ],
+      });
+      return (
+        <>
+          {fa.fieldArrayProps.rowIds.map((rowId: number) => (
+            <Lessons key={rowId} rowId={rowId} />
+          ))}
+        </>
+      );
+    }
+    await render(
+      <FormProvider>
+        <Form />
+      </FormProvider>
+    );
+    // Inserted at index 0, where the initial values have "Old lesson": it must not be copied
+    await run(() => fa.prepend({ title: 'New' }));
+    await run(() =>
+      fa.append({ title: 'With data', lessons: [{ title: 'Given' }] })
+    );
+    expect(ctx.getValues().values.sections).toEqual([
+      { title: 'New', lessons: [{ title: 'Default lesson' }] },
+      { title: 'Old', lessons: [{ title: 'Old lesson' }] },
+      { title: 'With data', lessons: [{ title: 'Given' }] },
+    ]);
+  });
+});
+
+describe('form schema with empty nested fields', () => {
+  it('reports the error on the empty field, not on its missing parent object', async () => {
+    const onError = vi.fn();
+    let form: any;
+    function Form() {
+      form = useForm({
+        schema: z.object({
+          contact: z.object({ email: z.email('Enter an email') }),
+        }),
+        onSubmit: () => undefined,
+        onError,
+      });
+      return <Input name="contact.email" api={{}} />;
+    }
+    await render(
+      <FormProvider>
+        <Form />
+      </FormProvider>
+    );
+    await run(() => form.handleSubmit());
+    expect(onError.mock.calls[0][0]).toEqual([
+      {
+        error: 'Enter an email',
+        name: 'contact.email',
+        ancestors: [],
+        type: 'field',
+      },
+    ]);
+    expect(onError.mock.calls[0][1]).toEqual([]);
+    // The submitted values aren't changed
+    expect(form.getValues().values).toEqual({});
+  });
+});

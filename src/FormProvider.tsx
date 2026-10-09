@@ -22,6 +22,7 @@ import {
   fieldArrayColAtomValueSelectorFamily,
   fieldAtomFamily,
   fieldKey,
+  areRowsFromInitialValues,
   fieldSchemaErrorAtom,
   formConfigAtom,
   formErrorsAtom,
@@ -840,6 +841,15 @@ export function useFieldArray(props: IFieldArrayProps) {
       formId,
     }) as unknown as FormAtom<IFieldArrayAtomValue>
   );
+  // Error from the form-level schema for the array itself, e.g. "Add at least one item"
+  const schemaError = useAtomValue(
+    fieldSchemaErrorAtom({
+      name,
+      ancestors: ancestors ?? [],
+      type: 'field-array',
+      formId,
+    })
+  );
   const fieldArrayValueForValidation = useFieldArrayColumnWatch({
     fieldArrayName: name,
     ancestors: ancestors ?? [],
@@ -1185,9 +1195,19 @@ export function useFieldArray(props: IFieldArrayProps) {
           },
           get
         );
+        // In a row added after the form was initialized, the initial values at this path belong to another row
+        const fromInitialValues = areRowsFromInitialValues(
+          formId,
+          ancestors ?? [],
+          get
+        );
         const initialValue =
-          getPathInObj(initialValues.values, objPath) ?? defaultValue;
-        const extraInfo = getPathInObj(initialValues.extraInfos, objPath);
+          (fromInitialValues
+            ? getPathInObj(initialValues.values, objPath)
+            : undefined) ?? defaultValue;
+        const extraInfo = fromInitialValues
+          ? getPathInObj(initialValues.extraInfos, objPath)
+          : undefined;
         prevFieldArrayValue.current = {
           values: initialValue ?? [],
           extraInfos: extraInfo ?? [],
@@ -1219,6 +1239,7 @@ export function useFieldArray(props: IFieldArrayProps) {
               extraInfoArr: extraInfo,
               initialValuesVersion: initialValues.version,
               skipRecursion: true,
+              isInitialization: true,
             }
           );
         }
@@ -1298,7 +1319,7 @@ export function useFieldArray(props: IFieldArrayProps) {
     validateDataAsync,
     getFieldArrayValue,
     setFieldArrayValue,
-    error: fieldArrayProps?.error,
+    error: fieldArrayProps?.error || schemaError || undefined,
     /** The array's async validator is running */
     isValidating: !!fieldArrayProps?.isValidating,
   };
@@ -1404,6 +1425,28 @@ const getFormValues = (formId: string, get: FormGetter) => {
   }
   return { values, extraInfos };
 };
+
+/**
+ * The values a form schema checks: the form values, plus every mounted field's path even when the field
+ * is empty. Without it, empty fields under `contact.` leave out `contact`, and the schema reports
+ * "expected object" for `contact` instead of an error on the field itself.
+ */
+function getSchemaValues(formId: string, get: FormGetter) {
+  const { values } = getFormValues(formId, get);
+  for (const { atomValue, param } of Object.values(
+    combinedFieldAtomValues[formId]?.fields ?? {}
+  )) {
+    if (!atomValue.initVer || atomValue.data !== undefined) {
+      continue;
+    }
+    const path = getFullObjectPath(param, get);
+    // A field of a removed row has no position
+    if (!path.includes('[-1]') && getPathInObj(values, path) === undefined) {
+      setPathInObj(values, path, undefined);
+    }
+  }
+  return values;
+}
 
 // Elements attached with useField's `ref`, used to focus the first invalid field
 const fieldElements = new Map<string, Map<string, any>>();
@@ -1700,7 +1743,7 @@ function validateForm(params: {
         run.schemaFormErrors = mapped.form;
       }
     };
-    const issues = getSchemaIssues(schema, values);
+    const issues = getSchemaIssues(schema, getSchemaValues(formId, get));
     if (isPromiseLike<ISchemaIssue[]>(issues)) {
       collector.addPending(Promise.resolve(issues).then(applyIssues));
     } else {
@@ -2072,7 +2115,7 @@ export function useForm<Values = any>(props: IFormProps<Values>) {
         return;
       }
       const id = ++runId;
-      const { values } = getFormValues(formId, (a) => store.get(a));
+      const values = getSchemaValues(formId, (a) => store.get(a));
       const apply = (issues: ISchemaIssue[]) => {
         if (id === runId) {
           store.set(transactionAtom, ({ get, set }) =>

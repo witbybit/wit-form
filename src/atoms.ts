@@ -314,6 +314,28 @@ export function getFullObjectPath(
   return path;
 }
 
+/**
+ * Whether every row in `ancestors` was created from the initial values. A list inside a row that
+ * was added later must not read the initial values at its index (they belong to another row).
+ */
+export function areRowsFromInitialValues(
+  formId: string,
+  ancestors: IAncestorInput[],
+  get: FormGetter
+) {
+  return ancestors.every((ancestor, i) => {
+    const parent = get(
+      fieldAtomFamily({
+        formId,
+        ancestors: ancestors.slice(0, i),
+        name: ancestor.name,
+        type: 'field-array',
+      })
+    ) as IFieldArrayAtomValue;
+    return !!parent.initialRowIds?.includes(ancestor.rowId);
+  });
+}
+
 export function resetFieldArrayRow(
   formId: string,
   params: IFieldArrayRowInput,
@@ -580,6 +602,8 @@ interface ISetFieldArrayParams {
     // Replaces the values of existing rows, starting at rowIndex, keeping their row ids
     | { type: 'update'; rowIndex: number };
   skipRecursion?: boolean;
+  /** The rows come from the initial values (remembered so nested lists know which rows those are) */
+  isInitialization?: boolean;
 }
 
 export function setFieldArrayDataAndExtraInfo(
@@ -596,6 +620,7 @@ export function setFieldArrayDataAndExtraInfo(
     initialValuesVersion,
     mode,
     fieldNames: childFields,
+    isInitialization,
   } = setParams;
   if (!mode) {
     mode = { type: 'set' };
@@ -636,6 +661,7 @@ export function setFieldArrayDataAndExtraInfo(
           initialValuesVersion && childFields?.length
             ? childFields
             : (val as IFieldArrayAtomValue).fieldNames,
+        ...(isInitialization ? { initialRowIds: rowIds } : {}),
       } as Partial<IFieldArrayAtomValue>)
     );
     for (const rowId of rowIdsToRemove) {
@@ -727,6 +753,11 @@ export function setFieldArrayDataAndExtraInfo(
           } else if (field.type === 'field-array') {
             const data = getPathInObj(fieldValues, field.name);
             const extraInfo = getPathInObj(extraInfos, field.name);
+            if (data === undefined && mode.type !== 'set') {
+              // A new or updated row without this list: leave it alone, so a new row's list
+              // starts from its useFieldArray defaultValue and an updated row keeps its rows
+              continue;
+            }
             setFieldArrayDataAndExtraInfo(
               formId,
               { name: field.name, ancestors: fieldAncestors },
@@ -741,6 +772,7 @@ export function setFieldArrayDataAndExtraInfo(
                 fieldNames: initialValuesVersion ? field.fieldNames : undefined,
                 // The nested arrays of new or updated rows get exactly the given rows
                 mode: { type: 'set' },
+                isInitialization,
               }
             );
           }

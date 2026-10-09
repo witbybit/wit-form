@@ -391,6 +391,12 @@ describe('field arrays', () => {
     expect(ctx.getValues().values).toEqual({
       sections: [{ title: 's1', tasks: [{ label: 't1' }, { label: 't2' }] }],
     });
+    // Initial values reach the inputs of nested rows
+    expect(
+      [...container.querySelectorAll('[data-field$=".label"] .value')].map(
+        (el) => el.textContent
+      )
+    ).toEqual(['t1', 't2']);
 
     await run(() =>
       ctx.setValue(
