@@ -316,10 +316,9 @@ describe('field arrays', () => {
 
     await run(() => fa.removeAll());
     expect(container.querySelectorAll('.row')).toHaveLength(0);
-    expect(form.getValues().values.items).toBeUndefined();
+    expect(form.getValues().values).toEqual({ items: [] });
   });
 
-  // Note: setting nested values only works for rows whose nested field arrays are already mounted
   it('supports nested field arrays and setting field arrays from context', async () => {
     let ctx: ReturnType<typeof useFormContext> = null as any;
     const fieldNames = [
@@ -389,6 +388,15 @@ describe('field arrays', () => {
     expect(container.querySelectorAll('[data-field$=".label"]')).toHaveLength(
       2
     );
+    expect(ctx.getValues().values).toEqual({
+      sections: [{ title: 's1', tasks: [{ label: 't1' }, { label: 't2' }] }],
+    });
+    // Initial values reach the inputs of nested rows
+    expect(
+      [...container.querySelectorAll('[data-field$=".label"] .value')].map(
+        (el) => el.textContent
+      )
+    ).toEqual(['t1', 't2']);
 
     await run(() =>
       ctx.setValue(
@@ -399,6 +407,8 @@ describe('field arrays', () => {
               title: 'n1',
               tasks: [{ label: 'x' }, { label: 'y' }, { label: 'z' }],
             },
+            // A new row whose nested array isn't mounted yet
+            { title: 'n2', tasks: [{ label: 'w' }] },
           ],
         }
       )
@@ -407,6 +417,7 @@ describe('field arrays', () => {
       ctx.getValue({ name: 'sections', type: 'field-array' })?.value
     ).toEqual([
       { title: 'n1', tasks: [{ label: 'x' }, { label: 'y' }, { label: 'z' }] },
+      { title: 'n2', tasks: [{ label: 'w' }] },
     ]);
     expect(ctx.getValues().values).toEqual({
       sections: [
@@ -414,10 +425,11 @@ describe('field arrays', () => {
           title: 'n1',
           tasks: [{ label: 'x' }, { label: 'y' }, { label: 'z' }],
         },
+        { title: 'n2', tasks: [{ label: 'w' }] },
       ],
     });
     expect(container.querySelectorAll('[data-field$=".label"]')).toHaveLength(
-      3
+      4
     );
   });
 });

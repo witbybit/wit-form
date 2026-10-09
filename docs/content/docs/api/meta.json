@@ -7,8 +7,10 @@
     "field",
     "use-field-array",
     "watch-hooks",
+    "use-form-state",
     "use-form-context",
     "use-set-form-props",
+    "create-form-hooks",
     "types"
   ]
 }

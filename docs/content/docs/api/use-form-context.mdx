@@ -142,3 +142,20 @@ Replaces the initial values and resets every field to them. Same as [`useForm`'s
 **Type:** `() => IFieldError[]`
 
 Validates every mounted field and field array and returns the errors. Same as [`useForm`'s `validateAllFields`](/docs/api/use-form#validateallfields).
+
+### `validateAllFieldsAsync`
+
+**Type:** `() => Promise<IFieldError[]>`
+
+Like `validateAllFields`, but waits for async validators.
+
+### `setError`, `clearErrors`, `setFormErrors`, `setFocus`
+
+The same as in [`useForm`](/docs/api/use-form#seterror), for components that aren't where `useForm` is called. For example, a field component can show a server error, or a button can clear errors.
+
+```ts
+const { setError } = useFormContext();
+setError('email', 'This email is already registered');
+```
+
+To read the form's state (`isValid`, `isSubmitting`, `errors`, ...) from any component, use [`useFormState`](/docs/api/use-form-state).

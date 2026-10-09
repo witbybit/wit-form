@@ -2,11 +2,14 @@ import { atom } from 'jotai';
 import {
   atomFamily,
   atomWithDefault,
+  type FormAtom,
   type FormGetter,
   type FormResetter,
   type FormSetter,
   getNewRowId,
+  stableStringify,
 } from './atomUtils';
+import { runValidator, ValidationCollector } from './validation';
 import {
   type FinalValues,
   type IAncestorInput,
@@ -17,11 +20,15 @@ import {
   type IFieldAtomSelectorInput,
   type IFieldAtomValue,
   type IFieldError,
+  type IFormConfig,
   type IFormPropsOverrideAtomValue,
+  type IFormSubmitState,
+  type IFieldType,
+  type Validator,
   type IGetFieldArrayInput,
   type InitialValues,
 } from './types';
-import { getPathInObj, isUndefined, setPathInObj } from './utils';
+import { getPathInObj, isDeepEqual, isUndefined, setPathInObj } from './utils';
 
 export const formValuesAtom = atomFamily('FormValues', (_formId: string) =>
   atomWithDefault<FinalValues>({ values: {}, extraInfos: {} })
@@ -113,10 +120,164 @@ export const fieldAtomFamily = atomFamily(
     )
 );
 
+/** Identifies a field or field array within a form (used for schema errors and focus) */
+export function fieldKey(
+  name: string,
+  ancestors: IAncestorInput[] | undefined,
+  type: IFieldType = 'field'
+) {
+  return stableStringify({
+    a: (ancestors ?? []).map((a) => [a.name, a.rowId]),
+    n: name,
+    t: type,
+  });
+}
+
+export const formConfigAtom = atomFamily('FormConfig', (_formId: string) =>
+  atom<IFormConfig>({ mode: 'onTouched', shouldFocusError: true })
+);
+
+export const initialSubmitState: IFormSubmitState = {
+  isSubmitting: false,
+  isSubmitted: false,
+  isSubmitSuccessful: false,
+  submitCount: 0,
+  isValidatingSubmit: false,
+  formErrors: [],
+};
+
+export const formSubmitStateAtom = atomFamily(
+  'FormSubmitState',
+  (_formId: string) => atom<IFormSubmitState>(initialSubmitState)
+);
+
+export interface ISchemaErrors {
+  /** Errors from the form schema, by fieldKey */
+  fields: Record<string, string>;
+  /** Issues that don't belong to a mounted field */
+  form: string[];
+}
+
+export const emptySchemaErrors: ISchemaErrors = { fields: {}, form: [] };
+
+export const formSchemaErrorsAtom = atomFamily(
+  'FormSchemaErrors',
+  (_formId: string) => atom<ISchemaErrors>(emptySchemaErrors)
+);
+
+/** The form schema's error for one field (only notifies that field when its own error changes) */
+export const fieldSchemaErrorAtom = atomFamily(
+  'FieldSchemaError',
+  (param: IFieldAtomSelectorInput) => {
+    const key = fieldKey(param.name, param.ancestors, param.type);
+    return atom(
+      (get) =>
+        get(formSchemaErrorsAtom(param.formId)).fields[key] as
+          string | undefined
+    );
+  }
+);
+
+interface IFormErrorsSummary {
+  errors: IFieldError[];
+  isValidating: boolean;
+  schemaFormErrors: string[];
+}
+
+/** All current errors of a form. Keeps the same object while nothing changes, so subscribers don't re-render. */
+export const formErrorsAtom = atomFamily('FormErrors', (formId: string) => {
+  let prev: IFormErrorsSummary | null = null;
+  return atom((get) => {
+    get(formFieldsVersionAtom(formId));
+    const schemaErrors = get(formSchemaErrorsAtom(formId));
+    const combined = combinedFieldAtomValues[formId];
+    const errors: IFieldError[] = [];
+    let isValidating = false;
+    const entries = combined
+      ? [
+          ...Object.values(combined.fields),
+          ...Object.values(combined.fieldArrays),
+        ]
+      : [];
+    for (const { atomValue, param } of entries) {
+      if (atomValue.isValidating) {
+        isValidating = true;
+      }
+      const error =
+        atomValue.error ||
+        schemaErrors.fields[fieldKey(param.name, param.ancestors, param.type)];
+      if (error) {
+        errors.push({
+          error,
+          name: param.name,
+          ancestors: param.ancestors,
+          type: param.type,
+        });
+      }
+    }
+    const next: IFormErrorsSummary = {
+      errors,
+      isValidating,
+      schemaFormErrors: schemaErrors.form,
+    };
+    if (prev && isDeepEqual(prev, next)) {
+      return prev;
+    }
+    prev = next;
+    return next;
+  });
+});
+
+export const formIsValidAtom = atomFamily('FormIsValid', (formId: string) =>
+  atom((get) => {
+    const { errors, schemaFormErrors } = get(formErrorsAtom(formId));
+    return errors.length === 0 && schemaFormErrors.length === 0;
+  })
+);
+
+export const formIsValidatingAtom = atomFamily(
+  'FormIsValidating',
+  (formId: string) =>
+    atom(
+      (get) =>
+        get(formErrorsAtom(formId)).isValidating ||
+        get(formSubmitStateAtom(formId)).isValidatingSubmit
+    )
+);
+
+export const formIsDirtyAtom = atomFamily('FormIsDirty', (formId: string) =>
+  atom(
+    (get) =>
+      !isDeepEqual(
+        get(formInitialValuesAtom(formId)).values,
+        get(formValuesAtom(formId)).values
+      )
+  )
+);
+
+export const formIsSubmittedAtom = atomFamily(
+  'FormIsSubmitted',
+  (formId: string) =>
+    atom((get) => get(formSubmitStateAtom(formId)).isSubmitted)
+);
+
+/** Used in place of a subscription that isn't needed (hooks must always subscribe to something) */
+export const falseAtom = atom(false);
+
 /**
  * Removes all the cached atoms of the form. Should only be used once the form is no longer used anywhere.
  */
 export function removeFormAtoms(formId: string) {
+  const isForm = (id: string) => id === formId;
+  formConfigAtom.removeWhere(isForm);
+  formSubmitStateAtom.removeWhere(isForm);
+  formSchemaErrorsAtom.removeWhere(isForm);
+  formErrorsAtom.removeWhere(isForm);
+  formIsValidAtom.removeWhere(isForm);
+  formIsValidatingAtom.removeWhere(isForm);
+  formIsDirtyAtom.removeWhere(isForm);
+  formIsSubmittedAtom.removeWhere(isForm);
+  fieldSchemaErrorAtom.removeWhere((param) => param.formId === formId);
   formValuesAtom.removeWhere((id) => id === formId);
   formPropsOverrideAtom.removeWhere((id) => id === formId);
   formInitialValuesAtom.removeWhere((id) => id === formId);
@@ -151,6 +312,28 @@ export function getFullObjectPath(
   }
   path = path + params.name;
   return path;
+}
+
+/**
+ * Whether every row in `ancestors` was created from the initial values. A list inside a row that
+ * was added later must not read the initial values at its index (they belong to another row).
+ */
+export function areRowsFromInitialValues(
+  formId: string,
+  ancestors: IAncestorInput[],
+  get: FormGetter
+) {
+  return ancestors.every((ancestor, i) => {
+    const parent = get(
+      fieldAtomFamily({
+        formId,
+        ancestors: ancestors.slice(0, i),
+        name: ancestor.name,
+        type: 'field-array',
+      })
+    ) as IFieldArrayAtomValue;
+    return !!parent.initialRowIds?.includes(ancestor.rowId);
+  });
 }
 
 export function resetFieldArrayRow(
@@ -216,6 +399,42 @@ interface IValidationParams {
   set: FormSetter;
   isValidation: boolean;
   skipFieldCheck?: boolean;
+  /** Collects async validation results. Errors from async validators are added to `errors` when they settle. */
+  collector?: ValidationCollector;
+  /** Shared with nested field arrays so their async errors end up in the same list */
+  errors?: IFieldError[];
+}
+
+/**
+ * Runs a field's validator during a submit/validation and records the result on the field.
+ * A failing field is marked as touched and validated so its error shows.
+ */
+export function validateFieldAtom(
+  fieldAtom: FormAtom<IFieldAtomValue | IFieldArrayAtomValue>,
+  validate: Validator | undefined,
+  args: [value: any, otherParams?: any],
+  set: FormSetter,
+  collector: ValidationCollector,
+  onError: (error: string) => void
+) {
+  if (!validate) {
+    return;
+  }
+  collector.add(
+    runValidator(() => validate(...args)),
+    (error) => {
+      set(fieldAtom, (val) =>
+        Object.assign({}, val, {
+          error: error ?? undefined,
+          isValidating: false,
+          ...(error ? { touched: true, validated: true } : {}),
+        })
+      );
+      if (error) {
+        onError(error);
+      }
+    }
+  );
 }
 
 export function getFieldArrayDataAndExtraInfo(
@@ -233,10 +452,12 @@ export function getFieldArrayDataAndExtraInfo(
   const isValidation = validationParams?.isValidation;
   const set = validationParams?.set;
   const skipFieldCheck = validationParams?.skipFieldCheck;
+  // Errors of async validators are pushed into `errors` once they settle; callers await the collector
+  const collector = validationParams?.collector ?? new ValidationCollector();
   let { name } = params;
   const data: any[] = [];
   const extraInfo: any = [];
-  const errors: IFieldError[] = [];
+  const errors: IFieldError[] = validationParams?.errors ?? [];
   const fieldArrayAtom = fieldAtomFamily({
     ancestors: params.ancestors,
     name: params.name,
@@ -270,20 +491,21 @@ export function getFieldArrayDataAndExtraInfo(
           formId,
         });
         const fieldValue = get(fieldAtom) as IFieldAtomValue;
-        if (isValidation && !skipFieldCheck) {
-          const error = fieldValue.validate?.(fieldValue.data);
-          if (error) {
-            errors.push({
-              error,
-              name: field,
-              type: 'field',
-              ancestors: fieldRelativeAncestors,
-            });
-            set?.(fieldAtom, (val) => ({
-              ...val,
-              error,
-            }));
-          }
+        if (isValidation && !skipFieldCheck && set) {
+          validateFieldAtom(
+            fieldAtom,
+            fieldValue.validate,
+            [fieldValue.data],
+            set,
+            collector,
+            (error) =>
+              errors.push({
+                error,
+                name: field,
+                type: 'field',
+                ancestors: fieldRelativeAncestors,
+              })
+          );
         }
         setPathInObj(data[rowIdx], field, fieldValue.data);
         setPathInObj(extraInfo[rowIdx], field, fieldValue.extraInfo);
@@ -296,20 +518,21 @@ export function getFieldArrayDataAndExtraInfo(
             formId,
           });
           const fieldValue = get(fieldAtom) as IFieldAtomValue;
-          if (isValidation && !skipFieldCheck) {
-            const error = fieldValue.validate?.(fieldValue.data);
-            if (error) {
-              errors.push({
-                error,
-                name: field.name,
-                type: 'field',
-                ancestors: fieldRelativeAncestors,
-              });
-              set?.(fieldAtom, (val) => ({
-                ...val,
-                error,
-              }));
-            }
+          if (isValidation && !skipFieldCheck && set) {
+            validateFieldAtom(
+              fieldAtom,
+              fieldValue.validate,
+              [fieldValue.data],
+              set,
+              collector,
+              (error) =>
+                errors.push({
+                  error,
+                  name: field.name,
+                  type: 'field',
+                  ancestors: fieldRelativeAncestors,
+                })
+            );
           }
           setPathInObj(data[rowIdx], field.name, fieldValue.data);
           setPathInObj(extraInfo[rowIdx], field.name, fieldValue.extraInfo);
@@ -325,10 +548,12 @@ export function getFieldArrayDataAndExtraInfo(
               ancestors: fieldAncestors,
             },
             get,
-            validationParams,
+            validationParams
+              ? { ...validationParams, collector, errors }
+              : undefined,
             fieldRelativeAncestors
           );
-          if (fieldErrors?.length) {
+          if (fieldErrors?.length && fieldErrors !== errors) {
             errors.push(...fieldErrors);
           }
           if (!isUndefined(fieldData)) {
@@ -341,20 +566,21 @@ export function getFieldArrayDataAndExtraInfo(
       }
     }
   }
-  if (isValidation) {
-    const error = fieldArrayAtomValue.validate?.(data);
-    if (error) {
-      errors.push({
-        error,
-        name: name,
-        type: 'field-array',
-        ancestors: relativeAncestors ?? [],
-      });
-      set?.(fieldArrayAtom, (val) => ({
-        ...val,
-        error,
-      }));
-    }
+  if (isValidation && set) {
+    validateFieldAtom(
+      fieldArrayAtom,
+      fieldArrayAtomValue.validate,
+      [data],
+      set,
+      collector,
+      (error) =>
+        errors.push({
+          error,
+          name: name,
+          type: 'field-array',
+          ancestors: relativeAncestors ?? [],
+        })
+    );
   }
   return { data, extraInfo, errors };
 }
@@ -370,8 +596,14 @@ interface ISetFieldArrayParams {
   initialValuesVersion?: number;
   // Needed only for initializing the field array
   fieldNames?: IChildFieldInfo[];
-  mode?: { type: 'set' } | { type: 'insert'; rowIndex?: number };
+  mode?:
+    | { type: 'set' }
+    | { type: 'insert'; rowIndex?: number }
+    // Replaces the values of existing rows, starting at rowIndex, keeping their row ids
+    | { type: 'update'; rowIndex: number };
   skipRecursion?: boolean;
+  /** The rows come from the initial values (remembered so nested lists know which rows those are) */
+  isInitialization?: boolean;
 }
 
 export function setFieldArrayDataAndExtraInfo(
@@ -388,6 +620,7 @@ export function setFieldArrayDataAndExtraInfo(
     initialValuesVersion,
     mode,
     fieldNames: childFields,
+    isInitialization,
   } = setParams;
   if (!mode) {
     mode = { type: 'set' };
@@ -428,6 +661,7 @@ export function setFieldArrayDataAndExtraInfo(
           initialValuesVersion && childFields?.length
             ? childFields
             : (val as IFieldArrayAtomValue).fieldNames,
+        ...(isInitialization ? { initialRowIds: rowIds } : {}),
       } as Partial<IFieldArrayAtomValue>)
     );
     for (const rowId of rowIdsToRemove) {
@@ -455,6 +689,10 @@ export function setFieldArrayDataAndExtraInfo(
         initVer: initialValuesVersion ?? val.initVer,
       } as Partial<IFieldArrayAtomValue>)
     );
+  } else if (mode.type === 'update') {
+    startIndex = mode.rowIndex;
+    // Only update rows that exist
+    dataArr = (dataArr ?? []).slice(0, Math.max(rowIds.length - startIndex, 0));
   }
   if (dataArr?.length) {
     for (
@@ -470,7 +708,11 @@ export function setFieldArrayDataAndExtraInfo(
       const fieldAncestors = params.ancestors.length
         ? [...params.ancestors, { name: params.name, rowId }]
         : [{ name: params.name, rowId }];
-      for (const field of fieldArrayAtomValue.fieldNames) {
+      // Read the fields again: the array may have just received them above (e.g. a new nested array)
+      const { fieldNames: rowFieldNames } = get(
+        fieldAtomFamily(fieldArrayParams)
+      ) as IFieldArrayAtomValue;
+      for (const field of rowFieldNames) {
         if (typeof field === 'string') {
           const data = getPathInObj(fieldValues, field);
           const extraInfo = getPathInObj(extraInfos, field);
@@ -511,6 +753,11 @@ export function setFieldArrayDataAndExtraInfo(
           } else if (field.type === 'field-array') {
             const data = getPathInObj(fieldValues, field.name);
             const extraInfo = getPathInObj(extraInfos, field.name);
+            if (data === undefined && mode.type !== 'set') {
+              // A new or updated row without this list: leave it alone, so a new row's list
+              // starts from its useFieldArray defaultValue and an updated row keeps its rows
+              continue;
+            }
             setFieldArrayDataAndExtraInfo(
               formId,
               { name: field.name, ancestors: fieldAncestors },
@@ -521,9 +768,11 @@ export function setFieldArrayDataAndExtraInfo(
                 reset,
                 extraInfoArr: extraInfo,
                 initialValuesVersion,
-                // Use fieldNames only for initializing values workflow since the child atoms don't exist yet
+                // The child array may not be mounted yet, so give it the fields declared by the parent
                 fieldNames: initialValuesVersion ? field.fieldNames : undefined,
-                mode,
+                // The nested arrays of new or updated rows get exactly the given rows
+                mode: { type: 'set' },
+                isInitialization,
               }
             );
           }

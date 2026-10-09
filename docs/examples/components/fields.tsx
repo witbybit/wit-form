@@ -8,12 +8,13 @@
  * in it re-renders only that component.
  */
 import { useId, useMemo, type ReactNode } from 'react';
-import { useField, type IAncestorInput } from 'wit-form';
+import { useField, type IAncestorInput, type StandardSchemaV1 } from 'wit-form';
 
+/** Returns an error message (or a promise of one), or null when the value is valid */
 type Validator<T> = (
   value: T | undefined,
   other?: { values: any; extraInfos: any }
-) => string | null | undefined;
+) => string | null | undefined | Promise<string | null | undefined>;
 
 type DepFields = (string | { name: string; ancestors?: IAncestorInput[] })[];
 
@@ -24,6 +25,10 @@ interface BaseFieldProps<T> {
   hint?: ReactNode;
   required?: boolean;
   validate?: Validator<T>;
+  /** A Standard Schema (Zod, Valibot, ArkType, ...) for this field's value */
+  schema?: StandardSchemaV1;
+  /** Wait for typing to pause (in milliseconds) before validating, e.g. for server checks */
+  debounceValidation?: number;
   /** Fields whose values are passed to `validate` as `other.values` */
   depFields?: DepFields;
   /** Only needed for fields inside a field array row */
@@ -68,6 +73,8 @@ function FieldShell(props: {
   required?: boolean;
   hint?: ReactNode;
   error?: string | null;
+  /** An async validator is running */
+  validating?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -87,7 +94,11 @@ function FieldShell(props: {
         </label>
       )}
       {props.children}
-      {props.error ? (
+      {props.validating ? (
+        <p className="mt-1 text-xs text-slate-500" aria-live="polite">
+          Checking…
+        </p>
+      ) : props.error ? (
         <p id={`${props.id}-error`} className="mt-1 text-xs text-red-600">
           {props.error}
         </p>
@@ -119,17 +130,21 @@ export function TextField(
   }
 ) {
   const id = useId();
-  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
-    name: props.name,
-    ancestors: props.ancestors,
-    defaultValue: props.defaultValue,
-    depFields: props.depFields,
-    validate: useValidator(props.required, props.validate),
-  });
+  const { fieldValue, setFieldValue, onBlur, error, isValidating, ref } =
+    useField<string>({
+      name: props.name,
+      ancestors: props.ancestors,
+      defaultValue: props.defaultValue,
+      depFields: props.depFields,
+      validate: useValidator(props.required, props.validate),
+      schema: props.schema,
+      debounceValidation: props.debounceValidation,
+    });
   return (
-    <FieldShell id={id} error={error} {...props}>
+    <FieldShell id={id} error={error} validating={isValidating} {...props}>
       <input
         id={id}
+        ref={ref}
         type={props.type ?? 'text'}
         className={`${inputClass} ${inputRing(error)}`}
         value={fieldValue ?? ''}
@@ -155,17 +170,21 @@ export function TextAreaField(
   props: BaseFieldProps<string> & { placeholder?: string; rows?: number }
 ) {
   const id = useId();
-  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
-    name: props.name,
-    ancestors: props.ancestors,
-    defaultValue: props.defaultValue,
-    depFields: props.depFields,
-    validate: useValidator(props.required, props.validate),
-  });
+  const { fieldValue, setFieldValue, onBlur, error, isValidating, ref } =
+    useField<string>({
+      name: props.name,
+      ancestors: props.ancestors,
+      defaultValue: props.defaultValue,
+      depFields: props.depFields,
+      validate: useValidator(props.required, props.validate),
+      schema: props.schema,
+      debounceValidation: props.debounceValidation,
+    });
   return (
-    <FieldShell id={id} error={error} {...props}>
+    <FieldShell id={id} error={error} validating={isValidating} {...props}>
       <textarea
         id={id}
+        ref={ref}
         rows={props.rows ?? 3}
         className={`${inputClass} ${inputRing(error)}`}
         value={fieldValue ?? ''}
@@ -191,17 +210,18 @@ export function NumberField(
   }
 ) {
   const id = useId();
-  const { fieldValue, setFieldValue, onBlur, error } = useField<
-    number | undefined
-  >({
-    name: props.name,
-    ancestors: props.ancestors,
-    defaultValue: props.defaultValue,
-    depFields: props.depFields,
-    validate: useValidator(props.required, props.validate),
-  });
+  const { fieldValue, setFieldValue, onBlur, error, isValidating, ref } =
+    useField<number | undefined>({
+      name: props.name,
+      ancestors: props.ancestors,
+      defaultValue: props.defaultValue,
+      depFields: props.depFields,
+      validate: useValidator(props.required, props.validate),
+      schema: props.schema,
+      debounceValidation: props.debounceValidation,
+    });
   return (
-    <FieldShell id={id} error={error} {...props}>
+    <FieldShell id={id} error={error} validating={isValidating} {...props}>
       <div className="relative">
         {props.prefix && (
           <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-sm text-slate-500">
@@ -210,6 +230,7 @@ export function NumberField(
         )}
         <input
           id={id}
+          ref={ref}
           type="number"
           inputMode="decimal"
           className={`${inputClass} ${inputRing(error)} ${
@@ -251,20 +272,21 @@ export function SelectField(
   }
 ) {
   const id = useId();
-  const { fieldValue, setFieldValue, onBlur, error } = useField<
-    string,
-    { label: string }
-  >({
-    name: props.name,
-    ancestors: props.ancestors,
-    defaultValue: props.defaultValue,
-    depFields: props.depFields,
-    validate: useValidator(props.required, props.validate),
-  });
+  const { fieldValue, setFieldValue, onBlur, error, isValidating, ref } =
+    useField<string, { label: string }>({
+      name: props.name,
+      ancestors: props.ancestors,
+      defaultValue: props.defaultValue,
+      depFields: props.depFields,
+      validate: useValidator(props.required, props.validate),
+      schema: props.schema,
+      debounceValidation: props.debounceValidation,
+    });
   return (
-    <FieldShell id={id} error={error} {...props}>
+    <FieldShell id={id} error={error} validating={isValidating} {...props}>
       <select
         id={id}
+        ref={ref}
         className={`${inputClass} ${inputRing(error)} pr-8`}
         value={fieldValue ?? ''}
         disabled={props.disabled}
@@ -294,18 +316,22 @@ export function CheckboxField(
   props: Omit<BaseFieldProps<boolean>, 'hideLabel'> & { label: ReactNode }
 ) {
   const id = useId();
-  const { fieldValue, setFieldValue, onBlur, error } = useField<boolean>({
-    name: props.name,
-    ancestors: props.ancestors,
-    defaultValue: props.defaultValue,
-    depFields: props.depFields,
-    validate: useValidator(props.required, props.validate),
-  });
+  const { fieldValue, setFieldValue, onBlur, error, isValidating, ref } =
+    useField<boolean>({
+      name: props.name,
+      ancestors: props.ancestors,
+      defaultValue: props.defaultValue,
+      depFields: props.depFields,
+      validate: useValidator(props.required, props.validate),
+      schema: props.schema,
+      debounceValidation: props.debounceValidation,
+    });
   return (
     <div className={props.className}>
       <div className="flex items-start gap-2">
         <input
           id={id}
+          ref={ref}
           type="checkbox"
           className="mt-0.5 h-4 w-4 accent-emerald-600"
           checked={!!fieldValue}

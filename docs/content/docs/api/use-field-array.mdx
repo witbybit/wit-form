@@ -1,6 +1,6 @@
 ---
 title: 'useFieldArray'
-description: 'useFieldArray manages a list of rows that share the same fields: line items, guests, table rows. It tracks which rows exist and in what order, and gives you functions to add, insert and remove them. The inputs inside each row are still regular useField fields.'
+description: 'useFieldArray manages a list of rows that share the same fields: line items, guests, table rows. It tracks which rows exist and in what order, and gives you functions to add, insert, move and remove them. The inputs inside each row are still regular useField fields.'
 ---
 
 ```ts
@@ -40,7 +40,7 @@ The fields in each row. Wit Form uses this list to build each row's object in th
 fieldNames: ['product', 'qty', 'price'];
 ```
 
-Strings and `{ name, type: 'field' }` mean the same thing. The `type: 'field-array'` form declares a nested list, but has limitations in this version. See [Nested field arrays](/docs/guides/field-arrays#nested-field-arrays).
+Strings and `{ name, type: 'field' }` mean the same thing. The `type: 'field-array'` form declares a nested list, so new rows (from `append`, `insert`, `update` or `setFieldArrayValue`) can include their nested rows. See [Nested field arrays](/docs/guides/field-arrays#nested-field-arrays).
 
 ### `ancestors`
 
@@ -59,11 +59,17 @@ useFieldArray({
 
 ### `validate`
 
-**Type:** `(rows: any[]) => string | null | undefined` · **Default:** none
+**Type:** `(rows: any[]) => string | null | undefined | Promise<...>` · **Default:** none
 
-Validates the list as a whole, like "Add at least one item". Receives every row as a plain object and returns an error message or `null`. It's checked whenever the rows change and on submit. The result is returned as `error`.
+Validates the list as a whole, like "Add at least one item". Receives every row as a plain object and returns an error message or `null`. It can be `async`. It's checked whenever the rows change and on submit. The result is returned as `error`.
 
 Define it outside your component or memoize it. When `validate` is set, the component calling `useFieldArray` re-renders on **every** change inside the list, because the validator needs all values. Skip it on very large lists. See [Performance](/docs/guides/performance).
+
+### `schema`
+
+**Type:** `StandardSchemaV1` · **Default:** none
+
+A schema for the list of rows, from any [Standard Schema](https://standardschema.dev) library. Runs before `validate`, like `z.array(z.object({ ... })).min(1, 'Add an item')`.
 
 ### `defaultValue`
 
@@ -97,6 +103,12 @@ append({ product: 'Pen', qty: 1 }); // one row with values
 append(rowA, rowB); // two rows
 ```
 
+### `prepend`
+
+**Type:** `(...rows: object[]) => void`
+
+Adds rows at the start. With no arguments, adds one empty row.
+
 ### `insert`
 
 **Type:** `(index: number, ...rows: object[]) => void`
@@ -110,9 +122,32 @@ insert(index + 1, getFieldArrayValue()[index]); // duplicate a row
 
 ### `remove`
 
-**Type:** `(index: number) => void`
+**Type:** `(index: number | number[]) => void`
 
-Removes the row at `index`.
+Removes the row at `index`, or the rows at several indexes:
+
+```ts
+remove(2);
+remove([0, 3, 4]);
+```
+
+### `swap`
+
+**Type:** `(indexA: number, indexB: number) => void`
+
+Swaps two rows. Only the order changes: both rows keep their ids, values, errors and touched state.
+
+### `move`
+
+**Type:** `(from: number, to: number) => void`
+
+Moves the row at `from` to `to`, shifting the rows in between. Use it after drag and drop. Like `swap`, rows keep their ids and state.
+
+### `update`
+
+**Type:** `(index: number, row: object, extraInfo?: object) => void`
+
+Replaces the values of the row at `index`. The row keeps its id, so its components don't remount. Nested lists that the row object leaves out keep their rows.
 
 ### `clear`
 
@@ -138,17 +173,35 @@ Returns the current rows as plain objects. It reads them once and doesn't subscr
 
 Replaces all rows. Rows are reused where possible and extra ones are added or removed.
 
+### `replace`
+
+**Type:** `(rows: object[]) => void`
+
+The same as `setFieldArrayValue`.
+
 ### `validateData`
 
 **Type:** `() => { errors: IFieldError[]; isValid: boolean }`
 
-Validates the list and the fields in its rows right now, shows their errors, and returns the result.
+Validates the list and the fields in its rows right now, shows their errors, and returns the result. Only sync validators are included. Async validators start, and their errors show when they finish.
+
+### `validateDataAsync`
+
+**Type:** `() => Promise<{ errors: IFieldError[]; isValid: boolean }>`
+
+Like `validateData`, but waits for async validators.
 
 ### `error`
 
 **Type:** `string | null | undefined`
 
-The error returned by `validate`. Unlike field errors, it doesn't wait for a touch: it shows as soon as it's set.
+The list's error: from `validate` or `schema`, from the form [`schema`](/docs/api/use-form#schema) (an issue at the list's path), or from `setError`. Unlike field errors, it doesn't wait for a touch: it shows as soon as it's set.
+
+### `isValidating`
+
+**Type:** `boolean`
+
+`true` while an async `validate` runs.
 
 ## Notes
 

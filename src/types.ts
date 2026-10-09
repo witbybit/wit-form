@@ -1,7 +1,31 @@
+import type {
+  MaybePromise,
+  StandardSchemaV1,
+  ValidationResult,
+} from './validation';
+
+export type { MaybePromise, StandardSchemaV1, ValidationResult };
+
+/**
+ * A validator returns an error message, or null/undefined when the value is valid.
+ * It may also return a promise of that (async validation).
+ */
+export type Validator<V = any, O = any> = (
+  value: V,
+  otherParams?: O
+) => MaybePromise<ValidationResult>;
+
 export interface IAtomValueBase {
   initVer: number;
+  /** Blurred, or marked by a submit/validation */
   touched?: boolean;
-  validate?: (data: any, otherParams?: any) => string | undefined | null;
+  /** Validated by submit, validateFields/validateAllFields or given an error with setError */
+  validated?: boolean;
+  /** Changed by the user through setFieldValue */
+  changed?: boolean;
+  /** An async validator is running (or a debounced validation is waiting) */
+  isValidating?: boolean;
+  validate?: Validator;
   error?: string | null;
   type: IFieldType;
 }
@@ -15,6 +39,8 @@ export interface IFieldArrayAtomValue extends IAtomValueBase {
   rowIds: number[];
   fieldNames: IChildFieldInfo[];
   skipUnregister?: boolean;
+  /** Rows created from the initial values. Nested lists only read initial values inside these rows. */
+  initialRowIds?: number[];
 }
 
 export interface InitialValues {
@@ -80,16 +106,22 @@ export interface IFieldProps<D> {
    * validate is only allowed to be set once when useField() is invoked.
    * If you need to use some external state for validation, please use validateCallback instead
    */
-  validate?: (value?: D, otherParams?: any) => string | undefined | null;
+  validate?: Validator<D | undefined>;
   /**
    * validateCallback will be a function wrapped in useCallback() and this will be updated
    * for internal state changes. Please be careful to make sure it has a fixed list of dependencies
    * and doesn't change all the time since that can cause an infinite loop.
    */
-  validateCallback?: (
-    value?: D,
-    otherParams?: any
-  ) => string | undefined | null;
+  validateCallback?: Validator<D | undefined>;
+  /**
+   * A Standard Schema (Zod, Valibot, ArkType, ...) for this field's value. Runs before validate.
+   */
+  schema?: StandardSchemaV1;
+  /**
+   * Wait this many milliseconds after the last change before validating.
+   * Useful for async validators that call a server. Submit never waits.
+   */
+  debounceValidation?: number;
   /**
    * Useful for referencing other fields in validation
    * */
@@ -113,7 +145,11 @@ export interface IFieldArrayProps {
   fieldNames: IChildFieldInfo[];
   // TODO: Implement validate here
   // Note that this should be memoized or kept outside a function component so that it doesn't change on every render.
-  validate?: (values: any[], otherParams?: any[]) => string | undefined | null;
+  validate?: Validator<any[]>;
+  /**
+   * A Standard Schema for the array of rows, e.g. z.array(z.object({...})).min(1)
+   */
+  schema?: StandardSchemaV1;
   depFields?: string[];
   skipUnregister?: boolean;
   ancestors?: IAncestorInput[];
@@ -157,19 +193,40 @@ export interface IIsDirtyProps {
   preCompareUpdateFormValues?: (formValues: any) => any;
 }
 
-export interface IFormProps {
-  onSubmit: (values: any, extraInfos?: any) => any;
+/**
+ * When field errors become visible:
+ * - onTouched (default): after the field is blurred, or after a submit/validation
+ * - onChange: as soon as the user changes the field (or it's blurred/submitted)
+ * - onSubmit: only after the first submit (or validateFields) attempt
+ */
+export type ValidationMode = 'onTouched' | 'onChange' | 'onSubmit';
+
+export interface IFormProps<Values = any> {
+  onSubmit: (values: Values, extraInfos?: any) => any;
   onError?: (
     errors?: IFieldError[] | null,
     formErrors?: any[] | null,
-    values?: any
+    values?: Values
   ) => any;
-  initialValues?: any;
+  initialValues?: unknown extends Values ? any : DeepPartial<Values>;
   /**
    * Useful in cases where you want to show the errors at the form level rather than field level
    * To show field level errors, please use validate() function in useField instead
    */
-  validate?: (data: any) => string[] | null | undefined;
+  validate?: (data: Values) => MaybePromise<string[] | null | undefined>;
+  /**
+   * A Standard Schema (Zod, Valibot, ArkType, ...) for all the form values.
+   * Issues are shown on the matching fields; issues without a matching field become form errors.
+   */
+  schema?: StandardSchemaV1;
+  /**
+   * When field errors become visible. Default 'onTouched'.
+   */
+  mode?: ValidationMode;
+  /**
+   * Focus the first invalid field (that has its `ref` attached) when a submit fails. Default true.
+   */
+  shouldFocusError?: boolean;
   /**
    * Should data be preserved if a field unmounts?
    * By default, this is false
@@ -189,3 +246,59 @@ export interface IFormProps {
 export interface IFormPropsOverrideAtomValue {
   validate: IFormProps['validate'] | null;
 }
+
+export interface IFormConfig {
+  mode: ValidationMode;
+  shouldFocusError: boolean;
+  /** The form schema, so validation started outside useForm (e.g. useFormContext) uses it too */
+  schema?: StandardSchemaV1;
+}
+
+export interface IFormSubmitState {
+  isSubmitting: boolean;
+  isSubmitted: boolean;
+  isSubmitSuccessful: boolean;
+  submitCount: number;
+  /** Waiting for async validators during a submit or validate*Async call */
+  isValidatingSubmit: boolean;
+  /** Errors from the form-level validate/schema in the last submit or validation, or set with setFormErrors */
+  formErrors: string[];
+}
+
+export interface IFormState {
+  /** onSubmit is running */
+  isSubmitting: boolean;
+  /** The form has been submitted at least once (whether or not it was valid) */
+  isSubmitted: boolean;
+  /** The last submit passed validation and onSubmit finished without failing */
+  isSubmitSuccessful: boolean;
+  /** How many times the form has been submitted */
+  submitCount: number;
+  /** Async validation is running for a field, a field array or a submit */
+  isValidating: boolean;
+  /** No field or field array has an error and the form schema (if any) passes */
+  isValid: boolean;
+  /** The values differ from the initial values */
+  isDirty: boolean;
+  /** Current errors of all fields and field arrays (including ones not shown yet) */
+  errors: IFieldError[];
+  /** Errors from the form-level validate/schema in the last submit, or set with setFormErrors */
+  formErrors: string[];
+}
+
+/** Recursively makes every property optional */
+export type DeepPartial<T> = T extends
+  | string
+  | number
+  | boolean
+  | bigint
+  | symbol
+  | null
+  | undefined
+  | Date
+  | Blob
+  | ((...args: any[]) => any)
+  ? T
+  : T extends readonly (infer E)[]
+    ? DeepPartial<E>[]
+    : { [K in keyof T]?: DeepPartial<T[K]> };

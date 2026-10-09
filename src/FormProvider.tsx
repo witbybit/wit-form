@@ -1,8 +1,9 @@
 import React, {
   useCallback,
   useEffect,
-  useState,
   Fragment,
+  useMemo,
+  useReducer,
   useRef,
   useContext,
 } from 'react';
@@ -16,19 +17,45 @@ import {
 } from 'jotai';
 import {
   combinedFieldAtomValues,
+  emptySchemaErrors,
+  falseAtom,
   fieldArrayColAtomValueSelectorFamily,
   fieldAtomFamily,
+  fieldKey,
+  areRowsFromInitialValues,
+  fieldSchemaErrorAtom,
+  formConfigAtom,
+  formErrorsAtom,
   formFieldsVersionAtom,
   formInitialValuesAtom,
+  formIsDirtyAtom,
+  formIsSubmittedAtom,
+  formIsValidatingAtom,
+  formIsValidAtom,
   formPropsOverrideAtom,
+  formSchemaErrorsAtom,
+  formSubmitStateAtom,
   formValuesAtom,
   getFieldArrayDataAndExtraInfo,
   getFullObjectPath,
+  type ISchemaErrors,
   multipleFieldsSelectorFamily,
   removeFormAtoms,
   resetFieldArrayRow,
   setFieldArrayDataAndExtraInfo,
+  validateFieldAtom,
 } from './atoms';
+import {
+  combineValidators,
+  errorToMessage,
+  getSchemaIssues,
+  isPromiseLike,
+  type ISchemaIssue,
+  runValidator,
+  type StandardSchemaV1,
+  ValidationCollector,
+  type ValidationResult,
+} from './validation';
 import {
   type FormAtom,
   type FormGetter,
@@ -43,6 +70,7 @@ import {
   type IFieldArrayAtomValue,
   type IFieldArrayColWatchParams,
   type IFieldArrayProps,
+  type IFieldAtomSelectorInput,
   type IFieldAtomValue,
   type IFieldError,
   type IFieldProps,
@@ -50,6 +78,8 @@ import {
   type IFormContextFieldInput,
   type IFormProps,
   type IFormPropsOverrideAtomValue,
+  type IFormState,
+  type IFormSubmitState,
   type IIsDirtyProps,
   type InitialValues,
   type IRemoveFieldParams,
@@ -111,21 +141,55 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
     defaultValue,
     depFields,
     skipUnregister,
+    schema,
+    debounceValidation,
   } = props;
   const formId = useContext(FormIdContext);
+  const store = useStore();
   const initialValues = useAtomValue(formInitialValuesAtom(formId));
-  const [atomValue, setAtomValue] = useAtom(
-    fieldAtomFamily({
-      ancestors: ancestors ?? [],
-      name,
-      type: 'field',
-      formId,
-    }) as unknown as FormAtom<IFieldAtomValue<D, E>>
+  const { mode } = useAtomValue(formConfigAtom(formId));
+  const fieldParam: IFieldAtomSelectorInput = {
+    ancestors: ancestors ?? [],
+    name,
+    type: 'field',
+    formId,
+  };
+  const fieldAtom = fieldAtomFamily(fieldParam) as unknown as FormAtom<
+    IFieldAtomValue<D, E>
+  >;
+  const [atomValue, setAtomValue] = useAtom(fieldAtom);
+  // Error from the form-level schema, if there is one
+  const schemaError = useAtomValue(fieldSchemaErrorAtom(fieldParam));
+  // Only subscribed when it matters, so other modes don't re-render every field on the first submit
+  const isFormSubmitted = useAtomValue(
+    mode === 'onSubmit' ? formIsSubmittedAtom(formId) : falseAtom
+  );
+  // The field schema runs before validate, as part of the same validator
+  const fieldValidate = useMemo(
+    () => combineValidators(schema, validate),
+    [validate]
+  );
+  const fieldValidateCallback = useMemo(
+    () =>
+      validateCallback
+        ? combineValidators(schema, validateCallback)
+        : undefined,
+    [validateCallback]
   );
   const oldOtherParamsRef = useRef<any>(null);
   const oldValueRef = useRef<any>(null);
   const oldTouchedRef = useRef<any>(false);
-  const { data: fieldValue, extraInfo, error, touched } = atomValue;
+  // Identifies the latest validation, so results of older async validations are ignored
+  const validationRunRef = useRef(0);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const {
+    data: fieldValue,
+    extraInfo,
+    error,
+    touched,
+    validated,
+    changed,
+  } = atomValue;
   const depObjFields =
     depFields?.map((f) =>
       typeof f === 'string' ? { name: f, formId } : { ...f, formId }
@@ -145,7 +209,7 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
         });
         set(fieldAtom, (val) =>
           Object.assign({}, val, {
-            validate,
+            validate: fieldValidate,
             initVer: initialValues.version,
           } as Partial<IFieldAtomValue>)
         );
@@ -158,7 +222,7 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
               data: initialValue === undefined ? defaultValue : initialValue,
               error: undefined,
               extraInfo,
-              validate,
+              validate: fieldValidate,
               initVer: initialValues.version,
               touched: false,
               type: 'field',
@@ -166,7 +230,7 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
           }
         }
       },
-    [name, defaultValue, validate, ancestors]
+    [name, defaultValue, fieldValidate, ancestors]
   );
 
   const resetField = useFormTransaction(
@@ -195,16 +259,19 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
   useEffect(() => {
     if (atomValue.initVer < initialValues.version) {
       initializeFieldValue();
-    } else if (validate && !atomValue.validate && !validateCallback) {
+    } else if (fieldValidate && !atomValue.validate && !fieldValidateCallback) {
       setAtomValue((val) =>
         Object.assign({}, val, {
-          validate,
+          validate: fieldValidate,
         } as Partial<IFieldAtomValue>)
       );
-    } else if (validateCallback && atomValue.validate !== validateCallback) {
+    } else if (
+      fieldValidateCallback &&
+      atomValue.validate !== fieldValidateCallback
+    ) {
       setAtomValue((val) =>
         Object.assign({}, val, {
-          validate: validateCallback,
+          validate: fieldValidateCallback,
         } as Partial<IFieldAtomValue>)
       );
     } else if (
@@ -225,14 +292,19 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
     initialValues.version,
     atomValue.initVer,
     defaultValue,
-    validate,
-    validateCallback,
+    fieldValidate,
+    fieldValidateCallback,
     atomValue.validate,
     setAtomValue,
   ]);
 
   useEffect(() => {
     return () => {
+      // Ignore async validations that finish after the field unmounts
+      validationRunRef.current++;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
       resetField();
     };
   }, [resetField]);
@@ -247,14 +319,86 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
       oldOtherParamsRef.current = otherParams;
       oldValueRef.current = fieldValue;
       oldTouchedRef.current = true;
-      setAtomValue((val) => {
-        const validateFn = validateCallback ?? val.validate;
-        return Object.assign({}, val, {
-          error: validateFn ? validateFn(fieldValue, otherParams) : undefined,
-        });
-      });
+      const runId = ++validationRunRef.current;
+      const applyError = (error: ValidationResult) => {
+        if (runId === validationRunRef.current) {
+          setAtomValue((val) =>
+            val.error === error && !val.isValidating
+              ? val
+              : Object.assign({}, val, { error, isValidating: false })
+          );
+        }
+      };
+      const runValidation = () => {
+        debounceTimerRef.current = null;
+        const validateFn =
+          fieldValidateCallback ?? store.get(fieldAtom).validate;
+        const result = validateFn
+          ? runValidator(() => validateFn(fieldValue, otherParams))
+          : undefined;
+        if (isPromiseLike<ValidationResult>(result)) {
+          setAtomValue((val) =>
+            val.isValidating
+              ? val
+              : Object.assign({}, val, { isValidating: true })
+          );
+          result.then(applyError);
+        } else {
+          applyError(result);
+        }
+      };
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (debounceValidation && debounceValidation > 0) {
+        setAtomValue((val) =>
+          val.isValidating
+            ? val
+            : Object.assign({}, val, { isValidating: true })
+        );
+        debounceTimerRef.current = setTimeout(
+          runValidation,
+          debounceValidation
+        );
+      } else {
+        runValidation();
+      }
     }
-  }, [fieldValue, otherParams, setAtomValue, validateCallback, touched]);
+  }, [
+    fieldValue,
+    otherParams,
+    setAtomValue,
+    fieldValidateCallback,
+    touched,
+    debounceValidation,
+    store,
+    fieldAtom,
+  ]);
+
+  const key = fieldKey(name, ancestors);
+  const ref = useCallback(
+    (element: any) => registerFieldElement(formId, key, element),
+    [formId, key]
+  );
+
+  // Compared with the value this field started with
+  let initialValue = ancestors?.length
+    ? getPathInObj(
+        initialValues.values,
+        getFullObjectPath(fieldParam, (a) => store.get(a))
+      )
+    : getPathInObj(initialValues.values, name);
+  if (initialValue === undefined) {
+    initialValue = defaultValue;
+  }
+
+  const visibleError = error || schemaError || undefined;
+  const showError =
+    mode === 'onSubmit'
+      ? validated || isFormSubmitted
+      : mode === 'onChange'
+        ? touched || validated || changed
+        : touched || validated;
 
   return {
     fieldValue,
@@ -266,12 +410,13 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
           Object.assign({}, val, {
             data,
             extraInfo,
+            changed: true,
           } as Partial<IFieldAtomValue>)
         );
       },
       [setAtomValue]
     ),
-    error: touched ? error : undefined,
+    error: showError ? visibleError : undefined,
     onBlur: useCallback(
       () =>
         setAtomValue((val) =>
@@ -280,6 +425,12 @@ export function useField<D = any, E = any>(props: IFieldProps<D>) {
       [setAtomValue]
     ),
     touched,
+    /** An async validator is running, or a debounced validation is waiting */
+    isValidating: !!atomValue.isValidating,
+    /** The value differs from the field's initial value */
+    isDirty: !isDeepEqual(fieldValue, initialValue),
+    /** Attach to the input so the form can focus it when a submit fails */
+    ref,
   };
 }
 
@@ -457,6 +608,8 @@ export function useFormContext(params?: { formId?: string }) {
               get,
               set,
               reset,
+              // New rows (and their nested arrays) belong to the current initial values, so they never re-initialize from them
+              initialValuesVersion: get(formInitialValuesAtom(formId)).version,
               dataArr: newValue.value,
               extraInfoArr: newValue.extraInfo,
             }
@@ -603,8 +756,19 @@ export function useFormContext(params?: { formId?: string }) {
     [formId]
   );
 
-  const validateAllFieldsInternal = useFormTransaction(
-    ({ get, set }) => getValidateAllFieldsFn({ get, set, formId }),
+  const runValidation = useFormTransaction(
+    ({ get, set }) =>
+      () => {
+        const { values, extraInfos } = getFormValues(formId, get);
+        return validateForm({
+          formId,
+          get,
+          set,
+          values,
+          extraInfos,
+          schema: get(formConfigAtom(formId)).schema,
+        });
+      },
     [formId]
   );
 
@@ -616,11 +780,18 @@ export function useFormContext(params?: { formId?: string }) {
     []
   );
 
-  const validateAllFields = useCallback(() => {
-    const { values, extraInfos } = getValuesAndExtraInfo();
-    const errors = validateAllFieldsInternal(values, extraInfos);
+  /** Validates every field and field array with their sync validators, without submitting */
+  const validateAllFields = useCallback(
+    () => runValidation().errors,
+    [runValidation]
+  );
+
+  /** Validates every field and field array and waits for async validators */
+  const validateAllFieldsAsync = useCallback(async () => {
+    const { errors, collector } = runValidation();
+    await collector.settled();
     return errors;
-  }, [getValuesAndExtraInfo, validateAllFieldsInternal]);
+  }, [runValidation]);
 
   return {
     getValue,
@@ -631,7 +802,9 @@ export function useFormContext(params?: { formId?: string }) {
     removeFields,
     resetInitialValues,
     validateAllFields,
+    validateAllFieldsAsync,
     getValuesAndExtraInfo,
+    ...useFormErrorActions(formId),
   };
 }
 
@@ -643,8 +816,21 @@ export function useFieldArray(props: IFieldArrayProps) {
     skipUnregister,
     ancestors,
     defaultValue,
+    schema,
   } = props;
   const formId = useContext(FormIdContext);
+  // The array schema runs before validate, as part of the same validator
+  const arrayValidate = useMemo(
+    () => combineValidators(schema, validate),
+    [validate]
+  );
+  const validationRunRef = useRef(0);
+  const fieldArrayAtom = fieldAtomFamily({
+    name,
+    ancestors: ancestors ?? [],
+    type: 'field-array',
+    formId,
+  }) as unknown as FormAtom<IFieldArrayAtomValue>;
   const initialValues = useAtomValue(formInitialValuesAtom(formId));
   const prevFieldArrayValue = useRef<any>(null);
   const [fieldArrayProps, setFieldArrayProps] = useAtom(
@@ -655,11 +841,20 @@ export function useFieldArray(props: IFieldArrayProps) {
       formId,
     }) as unknown as FormAtom<IFieldArrayAtomValue>
   );
+  // Error from the form-level schema for the array itself, e.g. "Add at least one item"
+  const schemaError = useAtomValue(
+    fieldSchemaErrorAtom({
+      name,
+      ancestors: ancestors ?? [],
+      type: 'field-array',
+      formId,
+    })
+  );
   const fieldArrayValueForValidation = useFieldArrayColumnWatch({
     fieldArrayName: name,
     ancestors: ancestors ?? [],
     // undefined means all fields
-    fieldNames: validate ? undefined : [],
+    fieldNames: arrayValidate ? undefined : [],
   });
   // const otherParams = useMultipleWatch({ names: depFields ?? [] })
 
@@ -673,51 +868,50 @@ export function useFieldArray(props: IFieldArrayProps) {
             get,
             set,
             reset,
+            // New rows (and their nested arrays) belong to the current initial values, so they never re-initialize from them
+            initialValuesVersion: get(formInitialValuesAtom(formId)).version,
             dataArr: fieldValues,
           }
         );
       }
   );
 
-  const validateData = useFormTransaction(
+  // Validates the rows and the fields in them. Failing fields are marked as touched.
+  const runValidateData = useFormTransaction(
     ({ get, set }) =>
       () => {
-        const { errors } = getFieldArrayDataAndExtraInfo(
+        const collector = new ValidationCollector();
+        const { errors = [] } = getFieldArrayDataAndExtraInfo(
           formId,
           { name, ancestors: ancestors ?? [] },
           get,
           {
             set,
             isValidation: true,
+            collector,
           }
         );
-        if (errors) {
-          for (const error of errors) {
-            set(
-              fieldAtomFamily({
-                ancestors: error.ancestors,
-                formId,
-                name: error.name,
-                type: error.type,
-              }),
-              (value) => {
-                const updatedValue = Object.assign({}, value, {
-                  error: error.error,
-                  touched: true,
-                });
-                return updatedValue;
-              }
-            );
-          }
-        }
-        return { errors, isValid: !errors?.length };
+        return { errors, collector };
       },
     [name, fieldArrayProps, formId]
   );
 
+  /** Validates with sync validators. Async validators start, and their errors show when they finish. */
+  const validateData = useCallback(() => {
+    const { errors } = runValidateData();
+    return { errors, isValid: !errors.length };
+  }, [runValidateData]);
+
+  /** Validates and waits for async validators */
+  const validateDataAsync = useCallback(async () => {
+    const { errors, collector } = runValidateData();
+    await collector.settled();
+    return { errors, isValid: !errors.length };
+  }, [runValidateData]);
+
   useEffect(() => {
     if (
-      validate &&
+      arrayValidate &&
       fieldArrayProps.initVer &&
       !isDeepEqual(
         fieldArrayValueForValidation?.values,
@@ -725,13 +919,30 @@ export function useFieldArray(props: IFieldArrayProps) {
       )
     ) {
       prevFieldArrayValue.current = fieldArrayValueForValidation;
-      const error = validate(fieldArrayValueForValidation?.values ?? []);
-      setFieldArrayProps((d) => Object.assign({}, d, { error }));
+      const runId = ++validationRunRef.current;
+      const result = runValidator(() =>
+        arrayValidate(fieldArrayValueForValidation?.values ?? [])
+      );
+      const applyError = (error: ValidationResult) => {
+        if (runId === validationRunRef.current) {
+          setFieldArrayProps((d) =>
+            Object.assign({}, d, { error, isValidating: false })
+          );
+        }
+      };
+      if (isPromiseLike<ValidationResult>(result)) {
+        setFieldArrayProps((d) =>
+          d.isValidating ? d : Object.assign({}, d, { isValidating: true })
+        );
+        result.then(applyError);
+      } else {
+        applyError(result);
+      }
     }
   }, [
     fieldArrayValueForValidation,
     setFieldArrayProps,
-    validate,
+    arrayValidate,
     fieldArrayProps.initVer,
   ]);
 
@@ -771,9 +982,10 @@ export function useFieldArray(props: IFieldArrayProps) {
     [name, ancestors, formId]
   );
 
+  /** Removes the row at `index`, or the rows at several indexes */
   const remove = useFormTransaction(
     ({ set, get, reset }) =>
-      (index: number) => {
+      (index: number | number[]) => {
         const fieldArrayAtomValue = get(
           fieldAtomFamily({
             ancestors: ancestors ?? [],
@@ -782,29 +994,95 @@ export function useFieldArray(props: IFieldArrayProps) {
             formId,
           })
         ) as IFieldArrayAtomValue;
-        let rowIdToRemove = fieldArrayAtomValue.rowIds[index];
-        if (rowIdToRemove !== null) {
+        const rowIdsToRemove = (Array.isArray(index) ? index : [index])
+          .map((i) => fieldArrayAtomValue.rowIds[i])
+          .filter((rowId) => rowId !== undefined);
+        if (!rowIdsToRemove.length) {
+          return;
+        }
+        for (const rowId of rowIdsToRemove) {
           resetFieldArrayRow(
             formId,
-            { name, rowId: rowIdToRemove, ancestors: ancestors ?? [] },
+            { name, rowId, ancestors: ancestors ?? [] },
             get,
             reset
           );
-          const tempRowIds = [...fieldArrayAtomValue.rowIds];
-          tempRowIds.splice(index, 1);
-          set(
-            fieldAtomFamily({
-              ancestors: ancestors ?? [],
-              name,
-              type: 'field-array',
-              formId,
-            }),
-            (existingValue) =>
-              Object.assign({}, existingValue, {
-                rowIds: tempRowIds,
-              })
-          );
         }
+        set(
+          fieldAtomFamily({
+            ancestors: ancestors ?? [],
+            name,
+            type: 'field-array',
+            formId,
+          }),
+          (existingValue) =>
+            Object.assign({}, existingValue, {
+              rowIds: (existingValue as IFieldArrayAtomValue).rowIds.filter(
+                (rowId) => !rowIdsToRemove.includes(rowId)
+              ),
+            })
+        );
+      },
+    [name, ancestors, formId]
+  );
+
+  /** Reorders rows. Only the row order changes, so rows keep their ids, values and state. */
+  const reorderRows = useFormTransaction(
+    ({ set }) =>
+      (reorder: (rowIds: number[]) => number[] | null) => {
+        set(fieldArrayAtom, (existingValue) => {
+          const rowIds = reorder([...existingValue.rowIds]);
+          return rowIds
+            ? Object.assign({}, existingValue, { rowIds })
+            : existingValue;
+        });
+      },
+    [fieldArrayAtom]
+  );
+
+  const swap = useCallback(
+    (indexA: number, indexB: number) =>
+      reorderRows((rowIds) => {
+        if (rowIds[indexA] === undefined || rowIds[indexB] === undefined) {
+          return null;
+        }
+        [rowIds[indexA], rowIds[indexB]] = [rowIds[indexB], rowIds[indexA]];
+        return rowIds;
+      }),
+    [reorderRows]
+  );
+
+  const move = useCallback(
+    (from: number, to: number) =>
+      reorderRows((rowIds) => {
+        if (rowIds[from] === undefined || to < 0 || to >= rowIds.length) {
+          return null;
+        }
+        const [rowId] = rowIds.splice(from, 1);
+        rowIds.splice(to, 0, rowId);
+        return rowIds;
+      }),
+    [reorderRows]
+  );
+
+  /** Replaces the values of the row at `index`, keeping its row id */
+  const update = useFormTransaction(
+    ({ set, get, reset }) =>
+      (index: number, row: any, extraInfo?: any) => {
+        setFieldArrayDataAndExtraInfo(
+          formId,
+          { name, ancestors: ancestors ?? [] },
+          {
+            get,
+            set,
+            reset,
+            // New rows (and their nested arrays) belong to the current initial values, so they never re-initialize from them
+            initialValuesVersion: get(formInitialValuesAtom(formId)).version,
+            dataArr: [row],
+            extraInfoArr: extraInfo === undefined ? undefined : [extraInfo],
+            mode: { type: 'update', rowIndex: index },
+          }
+        );
       },
     [name, ancestors, formId]
   );
@@ -854,12 +1132,34 @@ export function useFieldArray(props: IFieldArrayProps) {
             get,
             set,
             reset,
+            // New rows (and their nested arrays) belong to the current initial values, so they never re-initialize from them
+            initialValuesVersion: get(formInitialValuesAtom(formId)).version,
             dataArr: rows,
             mode: { type: 'insert' },
           }
         );
       },
     [name, fieldNames, formId]
+  );
+
+  const prepend = useFormTransaction(
+    ({ set, get, reset }) =>
+      (...rows: any[]) => {
+        setFieldArrayDataAndExtraInfo(
+          formId,
+          { name, ancestors: ancestors ?? [] },
+          {
+            get,
+            set,
+            reset,
+            // New rows (and their nested arrays) belong to the current initial values, so they never re-initialize from them
+            initialValuesVersion: get(formInitialValuesAtom(formId)).version,
+            dataArr: rows,
+            mode: { type: 'insert', rowIndex: 0 },
+          }
+        );
+      },
+    [name, ancestors, formId]
   );
 
   const insert = useFormTransaction(
@@ -872,6 +1172,8 @@ export function useFieldArray(props: IFieldArrayProps) {
             get,
             set,
             reset,
+            // New rows (and their nested arrays) belong to the current initial values, so they never re-initialize from them
+            initialValuesVersion: get(formInitialValuesAtom(formId)).version,
             dataArr: rows,
             mode: { type: 'insert', rowIndex: index },
           }
@@ -893,9 +1195,19 @@ export function useFieldArray(props: IFieldArrayProps) {
           },
           get
         );
+        // In a row added after the form was initialized, the initial values at this path belong to another row
+        const fromInitialValues = areRowsFromInitialValues(
+          formId,
+          ancestors ?? [],
+          get
+        );
         const initialValue =
-          getPathInObj(initialValues.values, objPath) ?? defaultValue;
-        const extraInfo = getPathInObj(initialValues.extraInfos, objPath);
+          (fromInitialValues
+            ? getPathInObj(initialValues.values, objPath)
+            : undefined) ?? defaultValue;
+        const extraInfo = fromInitialValues
+          ? getPathInObj(initialValues.extraInfos, objPath)
+          : undefined;
         prevFieldArrayValue.current = {
           values: initialValue ?? [],
           extraInfos: extraInfo ?? [],
@@ -909,7 +1221,7 @@ export function useFieldArray(props: IFieldArrayProps) {
           }),
           (val) =>
             Object.assign({}, val, {
-              validate,
+              validate: arrayValidate,
               fieldNames,
               initVer: initialValues.version,
               skipUnregister,
@@ -927,11 +1239,12 @@ export function useFieldArray(props: IFieldArrayProps) {
               extraInfoArr: extraInfo,
               initialValuesVersion: initialValues.version,
               skipRecursion: true,
+              isInitialization: true,
             }
           );
         }
       },
-    [name, validate, fieldNames, ancestors, skipUnregister, formId]
+    [name, arrayValidate, fieldNames, ancestors, skipUnregister, formId]
   );
 
   const resetFieldArray = useFormTransaction(
@@ -983,21 +1296,32 @@ export function useFieldArray(props: IFieldArrayProps) {
 
   useEffect(() => {
     return () => {
+      // Ignore async validations that finish after the field array unmounts
+      validationRunRef.current++;
       resetFieldArray(name);
     };
   }, [name, resetFieldArray]);
 
   return {
     append,
-    remove,
-    clear,
-    fieldArrayProps,
+    prepend,
     insert,
-    validateData,
+    remove,
     removeAll,
+    clear,
+    swap,
+    move,
+    update,
+    /** Replaces all rows (same as setFieldArrayValue) */
+    replace: setFieldArrayValue,
+    fieldArrayProps,
+    validateData,
+    validateDataAsync,
     getFieldArrayValue,
     setFieldArrayValue,
-    error: fieldArrayProps?.error,
+    error: fieldArrayProps?.error || schemaError || undefined,
+    /** The array's async validator is running */
+    isValidating: !!fieldArrayProps?.isValidating,
   };
 }
 
@@ -1067,60 +1391,561 @@ const getFormValues = (formId: string, get: FormGetter) => {
       );
     }
   }
+  // A mounted field array with no rows is an empty array (not missing), e.g. for schemas that require an array
+  for (const fieldArray of fieldArrays) {
+    const { atomValue, param } = fieldArray;
+    if (!atomValue.initVer || atomValue.rowIds.length) {
+      continue;
+    }
+    let path = '';
+    let isRowMounted = true;
+    for (let i = 0; i < param.ancestors.length; i++) {
+      const parent = fieldArrays.find(
+        (f) =>
+          f.param.name === param.ancestors[i].name &&
+          f.param.ancestors.length === i &&
+          f.param.ancestors.every(
+            (a, j) =>
+              a.name === param.ancestors[j].name &&
+              a.rowId === param.ancestors[j].rowId
+          )
+      );
+      const index =
+        parent?.atomValue.rowIds.indexOf(param.ancestors[i].rowId) ?? -1;
+      if (index === -1) {
+        isRowMounted = false;
+        break;
+      }
+      path += `${param.ancestors[i].name}[${index}].`;
+    }
+    path += param.name;
+    if (isRowMounted && getPathInObj(values, path) === undefined) {
+      setPathInObj(values, path, []);
+    }
+  }
   return { values, extraInfos };
 };
 
-function getValidateAllFieldsFn(props: {
-  get: FormGetter;
-  formId: string;
-  set: FormSetter;
-}) {
-  const { get, formId, set } = props;
-  return (values: any, extraInfos: any) => {
-    const errors: IFieldError[] = [];
-    for (const fieldAtomInfo of Object.values(
-      combinedFieldAtomValues[formId]?.fields ?? {}
-    )) {
-      const fieldAtom = fieldAtomFamily(fieldAtomInfo.param);
-      const formFieldData = get(fieldAtom) as IFieldAtomValue;
-      const errorMsg = formFieldData.validate?.(formFieldData.data, {
-        values,
-        extraInfos,
-      });
-      if (errorMsg) {
-        set(fieldAtom, (val) =>
-          Object.assign({}, val, { error: errorMsg, touched: true })
-        );
-        errors.push({
-          error: errorMsg,
-          ancestors: fieldAtomInfo.param.ancestors,
-          name: fieldAtomInfo.param.name,
-          type: 'field',
-        });
-      }
+/**
+ * The values a form schema checks: the form values, plus every mounted field's path even when the field
+ * is empty. Without it, empty fields under `contact.` leave out `contact`, and the schema reports
+ * "expected object" for `contact` instead of an error on the field itself.
+ */
+function getSchemaValues(formId: string, get: FormGetter) {
+  const { values } = getFormValues(formId, get);
+  for (const { atomValue, param } of Object.values(
+    combinedFieldAtomValues[formId]?.fields ?? {}
+  )) {
+    if (!atomValue.initVer || atomValue.data !== undefined) {
+      continue;
     }
-    for (const fieldArrayAtomInfo of Object.values(
-      combinedFieldAtomValues[formId]?.fieldArrays ?? {}
-    )) {
-      const { errors: fieldArrayErrors } = getFieldArrayDataAndExtraInfo(
-        formId,
-        fieldArrayAtomInfo.param,
-        get,
-        {
-          isValidation: true,
-          set,
-          skipFieldCheck: true,
-        }
-      );
-      if (fieldArrayErrors?.length) {
-        errors.push(...fieldArrayErrors);
-      }
+    const path = getFullObjectPath(param, get);
+    // A field of a removed row has no position
+    if (!path.includes('[-1]') && getPathInObj(values, path) === undefined) {
+      setPathInObj(values, path, undefined);
     }
-    return errors;
-  };
+  }
+  return values;
 }
 
-export function useForm(props: IFormProps) {
+// Elements attached with useField's `ref`, used to focus the first invalid field
+const fieldElements = new Map<string, Map<string, any>>();
+
+function registerFieldElement(formId: string, key: string, element: any) {
+  let elements = fieldElements.get(formId);
+  if (element) {
+    if (!elements) {
+      elements = new Map();
+      fieldElements.set(formId, elements);
+    }
+    elements.set(key, element);
+  } else if (elements) {
+    elements.delete(key);
+    if (!elements.size) {
+      fieldElements.delete(formId);
+    }
+  }
+}
+
+function focusField(element: any) {
+  if (element && typeof element.focus === 'function') {
+    element.focus();
+    return true;
+  }
+  return false;
+}
+
+/** Focuses the invalid field that comes first on the page (or first in the error list outside the DOM) */
+function focusFirstError(formId: string, errors: IFieldError[]) {
+  const elements = fieldElements.get(formId);
+  if (!elements) {
+    return;
+  }
+  const candidates = errors
+    .map((e) => elements.get(fieldKey(e.name, e.ancestors, e.type)))
+    .filter(Boolean);
+  if (
+    candidates.every((el) => typeof el.compareDocumentPosition === 'function')
+  ) {
+    candidates.sort((a, b) =>
+      // 4 = Node.DOCUMENT_POSITION_FOLLOWING
+      a.compareDocumentPosition(b) & 4 ? -1 : 1
+    );
+  }
+  for (const el of candidates) {
+    if (focusField(el)) {
+      return;
+    }
+  }
+}
+
+function pathFromIssue(path: PropertyKey[]) {
+  let result = '';
+  for (const segment of path) {
+    if (typeof segment === 'number') {
+      result += `[${segment}]`;
+    } else {
+      result += result ? `.${String(segment)}` : String(segment);
+    }
+  }
+  return result;
+}
+
+interface IMappedSchemaErrors extends ISchemaErrors {
+  params: Record<string, IFieldAtomSelectorInput>;
+}
+
+/**
+ * Maps schema issues onto the form's mounted fields by their full path (e.g. items[0].qty).
+ * An issue without a matching field goes to the closest enclosing field array, or else to the form.
+ */
+function mapSchemaIssues(
+  formId: string,
+  get: FormGetter,
+  issues: ISchemaIssue[]
+): IMappedSchemaErrors {
+  const byPath = new Map<string, IFieldAtomSelectorInput>();
+  const combined = combinedFieldAtomValues[formId];
+  for (const { param } of [
+    ...Object.values(combined?.fields ?? {}),
+    ...Object.values(combined?.fieldArrays ?? {}),
+  ]) {
+    byPath.set(getFullObjectPath(param, get), param);
+  }
+  const result: IMappedSchemaErrors = { fields: {}, form: [], params: {} };
+  for (const issue of issues) {
+    let param = byPath.get(pathFromIssue(issue.path));
+    for (let i = issue.path.length - 1; !param && i > 0; i--) {
+      const parent = byPath.get(pathFromIssue(issue.path.slice(0, i)));
+      if (parent?.type === 'field-array') {
+        param = parent;
+      }
+    }
+    if (param) {
+      const key = fieldKey(param.name, param.ancestors, param.type);
+      if (!result.fields[key]) {
+        result.fields[key] = issue.message;
+        result.params[key] = param;
+      }
+    } else if (!result.form.includes(issue.message)) {
+      result.form.push(issue.message);
+    }
+  }
+  return result;
+}
+
+function setSchemaErrors(
+  set: FormSetter,
+  formId: string,
+  errors: ISchemaErrors
+) {
+  set(formSchemaErrorsAtom(formId), (current) =>
+    isDeepEqual(current, errors)
+      ? current
+      : { fields: errors.fields, form: errors.form }
+  );
+}
+
+function isTargeted(
+  param: IFieldAtomSelectorInput,
+  targets: IFormContextFieldInput[] | undefined
+) {
+  if (!targets) {
+    return true;
+  }
+  return targets.some((t) => {
+    const tAncestors = t.ancestors ?? [];
+    const sameAncestors = (count: number) =>
+      tAncestors.every(
+        (a, i) =>
+          i < count &&
+          param.ancestors[i]?.name === a.name &&
+          param.ancestors[i]?.rowId === a.rowId
+      );
+    if (
+      t.name === param.name &&
+      t.type === param.type &&
+      tAncestors.length === param.ancestors.length &&
+      sameAncestors(tAncestors.length)
+    ) {
+      return true;
+    }
+    // Fields and arrays inside a targeted field array
+    return (
+      t.type === 'field-array' &&
+      param.ancestors.length > tAncestors.length &&
+      param.ancestors[tAncestors.length].name === t.name &&
+      sameAncestors(tAncestors.length)
+    );
+  });
+}
+
+function toTargets(
+  formId: string,
+  fieldNames: (string | IFormContextFieldInput)[]
+): IFormContextFieldInput[] {
+  const combinedFieldArrays = Object.values(
+    combinedFieldAtomValues[formId]?.fieldArrays ?? {}
+  );
+  return fieldNames.map((fieldName) => {
+    if (typeof fieldName !== 'string') {
+      return fieldName;
+    }
+    const isFieldArray = combinedFieldArrays.some(
+      (c) => c.param.name === fieldName && !c.param.ancestors.length
+    );
+    return {
+      name: fieldName,
+      ancestors: [],
+      type: isFieldArray ? 'field-array' : 'field',
+    };
+  });
+}
+
+interface IFormValidationRun {
+  errors: IFieldError[];
+  collector: ValidationCollector;
+  /** Schema issues that don't belong to a field (filled in when the schema settles) */
+  schemaFormErrors: string[];
+}
+
+/**
+ * Validates every field and field array, or only `targets`, plus the form schema.
+ * Failing fields are marked as touched. Async results are added when `collector` settles.
+ */
+function validateForm(params: {
+  formId: string;
+  get: FormGetter;
+  set: FormSetter;
+  values: any;
+  extraInfos: any;
+  targets?: IFormContextFieldInput[];
+  schema?: StandardSchemaV1;
+}): IFormValidationRun {
+  const { formId, get, set, values, extraInfos, targets, schema } = params;
+  const collector = new ValidationCollector();
+  const errors: IFieldError[] = [];
+  const run: IFormValidationRun = { errors, collector, schemaFormErrors: [] };
+  const otherParams = { values, extraInfos };
+
+  if (!targets) {
+    for (const { param } of Object.values(
+      combinedFieldAtomValues[formId]?.fields ?? {}
+    )) {
+      const fieldAtom = fieldAtomFamily(param);
+      const fieldData = get(fieldAtom) as IFieldAtomValue;
+      validateFieldAtom(
+        fieldAtom,
+        fieldData.validate,
+        [fieldData.data, otherParams],
+        set,
+        collector,
+        (error) =>
+          errors.push({
+            error,
+            ancestors: param.ancestors,
+            name: param.name,
+            type: 'field',
+          })
+      );
+    }
+    for (const { param } of Object.values(
+      combinedFieldAtomValues[formId]?.fieldArrays ?? {}
+    )) {
+      // The fields in the rows were validated above
+      getFieldArrayDataAndExtraInfo(formId, param, get, {
+        isValidation: true,
+        set,
+        skipFieldCheck: true,
+        collector,
+        errors,
+      });
+    }
+  } else {
+    for (const field of targets) {
+      const ancestors = field.ancestors ?? [];
+      if (field.type === 'field') {
+        const fieldAtom = fieldAtomFamily({
+          name: field.name,
+          type: 'field',
+          ancestors,
+          formId,
+        });
+        const fieldData = get(fieldAtom) as IFieldAtomValue;
+        validateFieldAtom(
+          fieldAtom,
+          fieldData.validate,
+          [fieldData.data, otherParams],
+          set,
+          collector,
+          (error) =>
+            errors.push({ error, ancestors, name: field.name, type: 'field' })
+        );
+      } else {
+        getFieldArrayDataAndExtraInfo(
+          formId,
+          { ancestors, name: field.name },
+          get,
+          { isValidation: true, set, collector, errors }
+        );
+      }
+    }
+  }
+
+  if (schema) {
+    const applyIssues = (issues: ISchemaIssue[]) => {
+      const mapped = mapSchemaIssues(formId, get, issues);
+      setSchemaErrors(set, formId, mapped);
+      for (const [key, param] of Object.entries(mapped.params)) {
+        if (!isTargeted(param, targets)) {
+          continue;
+        }
+        set(fieldAtomFamily(param), (val) =>
+          val.touched && val.validated
+            ? val
+            : Object.assign({}, val, { touched: true, validated: true })
+        );
+        const hasError = errors.some(
+          (e) =>
+            fieldKey(e.name, e.ancestors, e.type) ===
+            fieldKey(param.name, param.ancestors, param.type)
+        );
+        if (!hasError) {
+          errors.push({
+            error: mapped.fields[key],
+            ancestors: param.ancestors,
+            name: param.name,
+            type: param.type,
+          });
+        }
+      }
+      if (!targets) {
+        run.schemaFormErrors = mapped.form;
+      }
+    };
+    const issues = getSchemaIssues(schema, getSchemaValues(formId, get));
+    if (isPromiseLike<ISchemaIssue[]>(issues)) {
+      collector.addPending(Promise.resolve(issues).then(applyIssues));
+    } else {
+      applyIssues(issues);
+    }
+  }
+  return run;
+}
+
+/** setError, clearErrors, setFormErrors and setFocus, shared by useForm and useFormContext */
+function useFormErrorActions(formId: string) {
+  const setError = useFormTransaction(
+    ({ set }) =>
+      (key: string | IFormContextFieldInput, error: string) => {
+        const field: IFormContextFieldInput =
+          typeof key === 'string' ? toTargets(formId, [key])[0] : key;
+        set(
+          fieldAtomFamily({
+            name: field.name,
+            ancestors: field.ancestors ?? [],
+            type: field.type,
+            formId,
+          }),
+          (val) =>
+            Object.assign({}, val, {
+              error,
+              touched: true,
+              validated: true,
+              isValidating: false,
+            })
+        );
+      },
+    [formId]
+  );
+
+  const clearErrors = useFormTransaction(
+    ({ set }) =>
+      (keys?: (string | IFormContextFieldInput)[]) => {
+        const combined = combinedFieldAtomValues[formId];
+        const params: IFieldAtomSelectorInput[] = keys
+          ? toTargets(formId, keys).map((f) => ({
+              name: f.name,
+              ancestors: f.ancestors ?? [],
+              type: f.type,
+              formId,
+            }))
+          : [
+              ...Object.values(combined?.fields ?? {}),
+              ...Object.values(combined?.fieldArrays ?? {}),
+            ].map((entry) => entry.param);
+        for (const param of params) {
+          set(fieldAtomFamily(param), (val) =>
+            val.error ? Object.assign({}, val, { error: undefined }) : val
+          );
+        }
+        if (!keys) {
+          setSchemaErrors(set, formId, emptySchemaErrors);
+          set(formSubmitStateAtom(formId), (s) =>
+            s.formErrors.length ? { ...s, formErrors: [] } : s
+          );
+        } else {
+          set(formSchemaErrorsAtom(formId), (current) => {
+            const fields = { ...current.fields };
+            for (const param of params) {
+              delete fields[fieldKey(param.name, param.ancestors, param.type)];
+            }
+            return { ...current, fields };
+          });
+        }
+      },
+    [formId]
+  );
+
+  const setFormErrors = useFormTransaction(
+    ({ set }) =>
+      (formErrors: string[]) => {
+        set(formSubmitStateAtom(formId), (s) => ({ ...s, formErrors }));
+      },
+    [formId]
+  );
+
+  const setFocus = useCallback(
+    (key: string | IFormContextFieldInput) => {
+      const field: IFormContextFieldInput =
+        typeof key === 'string' ? toTargets(formId, [key])[0] : key;
+      focusField(
+        fieldElements
+          .get(formId)
+          ?.get(fieldKey(field.name, field.ancestors, field.type))
+      );
+    },
+    [formId]
+  );
+
+  return { setError, clearErrors, setFormErrors, setFocus };
+}
+
+type FormStateKey = keyof IFormState;
+
+function readFormState(get: FormGetter, formId: string, key: FormStateKey) {
+  switch (key) {
+    case 'isValid':
+      return get(formIsValidAtom(formId));
+    case 'isValidating':
+      return get(formIsValidatingAtom(formId));
+    case 'isDirty':
+      return get(formIsDirtyAtom(formId));
+    case 'errors':
+      return get(formErrorsAtom(formId)).errors;
+    default:
+      return get(formSubmitStateAtom(formId))[key];
+  }
+}
+
+function formStateAtomFor(formId: string, key: FormStateKey) {
+  switch (key) {
+    case 'isValid':
+      return formIsValidAtom(formId);
+    case 'isValidating':
+      return formIsValidatingAtom(formId);
+    case 'isDirty':
+      return formIsDirtyAtom(formId);
+    case 'errors':
+      return formErrorsAtom(formId);
+    default:
+      return formSubmitStateAtom(formId);
+  }
+}
+
+const formStateKeys: FormStateKey[] = [
+  'isSubmitting',
+  'isSubmitted',
+  'isSubmitSuccessful',
+  'submitCount',
+  'isValidating',
+  'isValid',
+  'isDirty',
+  'errors',
+  'formErrors',
+];
+
+/**
+ * The form state, where reading a property subscribes to it. A component re-renders only when a
+ * property it actually read changes, so reading `isSubmitting` doesn't re-render on every keystroke.
+ */
+function useTrackedFormState(formId: string): IFormState {
+  const store = useStore();
+  const [, forceRender] = useReducer((x: number) => x + 1, 0);
+  const tracked = useRef(new Map<FormStateKey, unknown>());
+
+  useEffect(() => {
+    const read = (key: FormStateKey) =>
+      readFormState((a) => store.get(a), formId, key);
+    // Re-renders when a tracked property changed. The stored values are refreshed first, so a property
+    // read outside render (e.g. in an event handler) can't keep triggering renders.
+    const renderIfChanged = () => {
+      let changed = false;
+      for (const [key, value] of tracked.current) {
+        const latest = read(key);
+        if (!Object.is(latest, value)) {
+          tracked.current.set(key, latest);
+          changed = true;
+        }
+      }
+      if (changed) {
+        forceRender();
+      }
+    };
+    const unsubscribes = [
+      ...new Set(
+        [...tracked.current.keys()].map((key) => formStateAtomFor(formId, key))
+      ),
+    ].map((a) => store.sub(a, renderIfChanged));
+    // Something may have changed between rendering and subscribing
+    renderIfChanged();
+    return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+  });
+
+  const state = {} as IFormState;
+  for (const key of formStateKeys) {
+    Object.defineProperty(state, key, {
+      enumerable: true,
+      get: () => {
+        const value = readFormState((a) => store.get(a), formId, key);
+        tracked.current.set(key, value);
+        return value;
+      },
+    });
+  }
+  return state;
+}
+
+/**
+ * Reads the form's state (isValid, isDirty, isSubmitting, errors, ...) from any component inside the form.
+ * Only the properties you read cause re-renders.
+ */
+export function useFormState(params?: { formId?: string }): IFormState {
+  const defaultFormId = useContext(FormIdContext);
+  return useTrackedFormState(params?.formId ?? defaultFormId);
+}
+
+export function useForm<Values = any>(props: IFormProps<Values>) {
   const {
     initialValues,
     onError,
@@ -1128,13 +1953,39 @@ export function useForm(props: IFormProps) {
     skipUnregister,
     validate,
     skipUnusedInitialValues,
+    schema,
+    mode = 'onTouched',
+    shouldFocusError = true,
   } = props;
-  const [formState, setFormState] = useState<{ isSubmitting: boolean }>({
-    isSubmitting: false,
-  });
   const formId = useContext(FormIdContext);
+  const store = useStore();
+  const formState = useTrackedFormState(formId);
   const initValuesVer = useRef(0);
   const isFormMounted = useRef(false);
+  const isFirstRender = useRef(true);
+
+  // Fields read the mode while rendering, so set it before they render the first time
+  if (isFirstRender.current) {
+    isFirstRender.current = false;
+    const config = store.get(formConfigAtom(formId));
+    if (
+      config.mode !== mode ||
+      config.shouldFocusError !== shouldFocusError ||
+      config.schema !== schema
+    ) {
+      store.set(formConfigAtom(formId), { mode, shouldFocusError, schema });
+    }
+  }
+  useEffect(() => {
+    store.set(formConfigAtom(formId), (config) =>
+      config.mode === mode &&
+      config.shouldFocusError === shouldFocusError &&
+      config.schema === schema
+        ? config
+        : { mode, shouldFocusError, schema }
+    );
+  }, [store, formId, mode, shouldFocusError, schema]);
+
   const getValidateFnFromAtom = useFormTransaction(({ get }) => () => {
     const validationFn = get(
       formPropsOverrideAtom(formId)
@@ -1142,7 +1993,7 @@ export function useForm(props: IFormProps) {
     return validationFn?.validate;
   });
 
-  function resetDataAtoms(reset: FormResetter) {
+  function resetDataAtoms(reset: FormResetter, set: FormSetter) {
     if (formId) {
       if (combinedFieldAtomValues?.[formId]?.fields) {
         for (const field of Object.values(
@@ -1161,13 +2012,17 @@ export function useForm(props: IFormProps) {
         }
         combinedFieldAtomValues[formId].fieldArrays = {};
       }
+      setSchemaErrors(set, formId, emptySchemaErrors);
+      set(formSubmitStateAtom(formId), (s) =>
+        s.formErrors.length ? { ...s, formErrors: [] } : s
+      );
     }
   }
 
   const handleReset = useFormTransaction(
-    ({ reset }) =>
+    ({ reset, set }) =>
       () => {
-        resetDataAtoms(reset);
+        resetDataAtoms(reset, set);
       },
     [formId]
   );
@@ -1190,7 +2045,7 @@ export function useForm(props: IFormProps) {
         },
         extraInfos?: any
       ) => {
-        resetDataAtoms(reset);
+        resetDataAtoms(reset, set);
         const existingVal = get(formInitialValuesAtom(formId));
         initValuesVer.current = (existingVal.version ?? 0) + 1;
         const newValues = values ?? existingVal.values;
@@ -1242,6 +2097,64 @@ export function useForm(props: IFormProps) {
     initialValues,
   ]);
 
+  // The form schema runs whenever a value changes, so fields show its errors as the user types
+  // (once they're visible according to `mode`) and formState.isValid stays accurate.
+  useEffect(() => {
+    if (!schema) {
+      store.set(transactionAtom, ({ set }) =>
+        setSchemaErrors(set, formId, emptySchemaErrors)
+      );
+      return;
+    }
+    let runId = 0;
+    let scheduled = false;
+    let active = true;
+    const run = () => {
+      scheduled = false;
+      if (!active) {
+        return;
+      }
+      const id = ++runId;
+      const values = getSchemaValues(formId, (a) => store.get(a));
+      const apply = (issues: ISchemaIssue[]) => {
+        if (id === runId) {
+          store.set(transactionAtom, ({ get, set }) =>
+            setSchemaErrors(set, formId, mapSchemaIssues(formId, get, issues))
+          );
+        }
+      };
+      const issues = getSchemaIssues(schema, values);
+      if (isPromiseLike<ISchemaIssue[]>(issues)) {
+        Promise.resolve(issues).then(apply);
+      } else {
+        apply(issues);
+      }
+    };
+    // Batch the changes of one interaction (e.g. setFieldValues) into a single run
+    const schedule = () => {
+      if (!scheduled) {
+        scheduled = true;
+        queueMicrotask(run);
+      }
+    };
+    // Run right away, so formState.isValid is accurate from the first render after mount
+    run();
+    const unsubscribeFields = store.sub(
+      formFieldsVersionAtom(formId),
+      schedule
+    );
+    const unsubscribeInitial = store.sub(
+      formInitialValuesAtom(formId),
+      schedule
+    );
+    return () => {
+      runId++;
+      active = false;
+      unsubscribeFields();
+      unsubscribeInitial();
+    };
+  }, [schema, formId, store]);
+
   const getValuesAndExtraInfo = useFormTransaction(
     ({ get }) =>
       () => {
@@ -1250,107 +2163,78 @@ export function useForm(props: IFormProps) {
     []
   );
 
-  const validateFields = useFormTransaction(
-    ({ set, get }) =>
-      (fieldNames?: (string | IFormContextFieldInput)[]) => {
-        const extValues = getFormValues(formId, get);
-        const errors: IFieldError[] = [];
-        const combinedFieldArrays = Object.values(
-          combinedFieldAtomValues[formId]?.fieldArrays ?? {}
-        );
-        if (fieldNames?.length) {
-          for (const fieldName of fieldNames) {
-            let field: IFormContextFieldInput | null = null;
-            if (typeof fieldName === 'string') {
-              const fieldArr = combinedFieldArrays.find(
-                (c) => c.param.name === fieldName && !c.param.ancestors.length
-              );
-              if (fieldArr) {
-                field = {
-                  name: fieldName,
-                  ancestors: [],
-                  type: 'field-array',
-                };
-              } else {
-                field = {
-                  name: fieldName,
-                  ancestors: [],
-                  type: 'field',
-                };
-              }
-            } else {
-              field = fieldName;
-            }
-            if (field.type === 'field') {
-              const name = field.name;
-              const ancestors = field.ancestors ?? [];
-              const fieldAtom = fieldAtomFamily({
-                name,
-                type: 'field',
-                ancestors: ancestors ?? [],
-                formId,
-              });
-              const formFieldData = get(fieldAtom) as IFieldAtomValue;
-              const errorMsg = formFieldData.validate?.(
-                formFieldData.data,
-                extValues
-              );
-              if (errorMsg) {
-                set(fieldAtom, (val) =>
-                  Object.assign({}, val, { error: errorMsg, touched: true })
-                );
-                errors.push({
-                  error: errorMsg,
-                  ancestors: ancestors ?? [],
-                  name,
-                  type: 'field',
-                });
-              }
-            } else {
-              const { errors: fieldArrayErrors } =
-                getFieldArrayDataAndExtraInfo(
-                  formId,
-                  {
-                    ancestors: field.ancestors ?? [],
-                    name: field.name,
-                  },
-                  get,
-                  {
-                    isValidation: true,
-                    set,
-                  }
-                );
-              if (fieldArrayErrors?.length) {
-                errors.push(...fieldArrayErrors);
-                for (const errorInfo of fieldArrayErrors) {
-                  if (errorInfo.type === 'field') {
-                    const fieldAtom = fieldAtomFamily({
-                      name: errorInfo.name,
-                      type: 'field',
-                      ancestors: errorInfo.ancestors ?? [],
-                      formId,
-                    });
-                    set(fieldAtom, (val) =>
-                      Object.assign({}, val, {
-                        error: errorInfo.error,
-                        touched: true,
-                      })
-                    );
-                  }
-                }
-              }
-            }
-          }
-        }
-        return errors;
+  const runValidation = useFormTransaction(
+    ({ get, set }) =>
+      (targets?: IFormContextFieldInput[]) => {
+        const { values, extraInfos } = getFormValues(formId, get);
+        return validateForm({
+          formId,
+          get,
+          set,
+          values,
+          extraInfos,
+          targets,
+          schema,
+        });
       },
-    [formId]
+    [formId, schema]
   );
 
-  const validateAllFieldsInternal = useFormTransaction(
-    ({ get, set }) => getValidateAllFieldsFn({ get, set, formId }),
-    [formId]
+  const setSubmitState = useCallback(
+    (update: Partial<IFormSubmitState>) =>
+      store.set(formSubmitStateAtom(formId), (s) => ({ ...s, ...update })),
+    [store, formId]
   );
+
+  /**
+   * Validates the given fields or field arrays with their sync validators and returns the errors.
+   * Async validators start, and their errors show when they finish. Use validateFieldsAsync to wait for them.
+   */
+  const validateFields = useCallback(
+    (fieldNames?: (string | IFormContextFieldInput)[]) => {
+      if (!fieldNames?.length) {
+        return [];
+      }
+      return runValidation(toTargets(formId, fieldNames)).errors;
+    },
+    [runValidation, formId]
+  );
+
+  /** Validates the given fields or field arrays and waits for async validators */
+  const validateFieldsAsync = useCallback(
+    async (fieldNames?: (string | IFormContextFieldInput)[]) => {
+      if (!fieldNames?.length) {
+        return [];
+      }
+      const { errors, collector } = runValidation(
+        toTargets(formId, fieldNames)
+      );
+      if (collector.hasPending) {
+        setSubmitState({ isValidatingSubmit: true });
+        await collector.settled();
+        setSubmitState({ isValidatingSubmit: false });
+      }
+      return errors;
+    },
+    [runValidation, formId, setSubmitState]
+  );
+
+  /** Validates every field and field array with their sync validators, without submitting */
+  const validateAllFields = useCallback(
+    () => runValidation().errors,
+    [runValidation]
+  );
+
+  /** Validates every field and field array and waits for async validators, without submitting */
+  const validateAllFieldsAsync = useCallback(async () => {
+    const { errors, collector } = runValidation();
+    if (collector.hasPending) {
+      setSubmitState({ isValidatingSubmit: true });
+      await collector.settled();
+      setSubmitState({ isValidatingSubmit: false });
+    }
+    return errors;
+  }, [runValidation, setSubmitState]);
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent<HTMLFormElement>) => {
@@ -1360,72 +2244,127 @@ export function useForm(props: IFormProps) {
       if (e && e.stopPropagation) {
         e.stopPropagation();
       }
+      store.set(formSubmitStateAtom(formId), (s) => ({
+        ...s,
+        submitCount: s.submitCount + 1,
+      }));
       const { values, extraInfos } = getValuesAndExtraInfo();
-      const errors = validateAllFieldsInternal(values, extraInfos);
-      const laterSetFormValidationFn = getValidateFnFromAtom();
-      const formErrors = laterSetFormValidationFn
-        ? laterSetFormValidationFn(values)
-        : validate?.(values);
-      if (errors.length || formErrors?.length) {
-        if (onError) {
-          onError(errors, formErrors, values);
+      const { errors, collector, ...run } = runValidation();
+      const formValidate = getValidateFnFromAtom() ?? validate;
+      let formErrors: string[] = [];
+      if (formValidate) {
+        let result: any;
+        try {
+          result = formValidate(values);
+        } catch (err) {
+          result = [errorToMessage(err)];
         }
-        return;
-      }
-      setFormState({ isSubmitting: true });
-      const res = onSubmit?.(values, extraInfos);
-      if (res && res.then) {
-        return res
-          .then((isSuccess?: boolean) => {
-            if (isFormMounted.current) {
-              // Assuming isSuccess to be true by default
-              if (isSuccess !== false) {
-                // Make initial values same as final values in order to set isDirty as false after submit
-                updateInitialValues(
-                  props?.reinitializeOnSubmit ? (initialValues ?? {}) : values,
-                  { skipUnregister, skipUnusedInitialValues },
-                  props?.reinitializeOnSubmit ? {} : extraInfos
-                );
+        if (isPromiseLike<string[] | null | undefined>(result)) {
+          collector.addPending(
+            Promise.resolve(result).then(
+              (res) => {
+                formErrors = res ?? [];
+              },
+              (err) => {
+                formErrors = [errorToMessage(err)];
               }
-              setFormState({ isSubmitting: false });
-            }
-          })
-          .catch(() => {
-            if (isFormMounted) {
-              setFormState({ isSubmitting: false });
-              // console.warn(
-              //   `Warning: An unhandled error was caught from onSubmit()`,
-              //   err
-              // );
-            }
+            )
+          );
+        } else {
+          formErrors = result ?? [];
+        }
+      }
+
+      const submitIfValid = () => {
+        const allFormErrors = [...formErrors, ...run.schemaFormErrors];
+        if (errors.length || allFormErrors.length) {
+          setSubmitState({
+            isSubmitted: true,
+            isSubmitSuccessful: false,
+            isValidatingSubmit: false,
+            formErrors: allFormErrors,
           });
-      } else {
-        setFormState({ isSubmitting: false });
+          if (store.get(formConfigAtom(formId)).shouldFocusError) {
+            focusFirstError(formId, errors);
+          }
+          if (onError) {
+            onError(errors, allFormErrors, values);
+          }
+          return;
+        }
+        setSubmitState({
+          isSubmitting: true,
+          isValidatingSubmit: false,
+          formErrors: [],
+        });
+        const finish = (isSuccess: boolean) =>
+          setSubmitState({
+            isSubmitting: false,
+            isSubmitted: true,
+            isSubmitSuccessful: isSuccess,
+          });
+        let res: any;
+        try {
+          res = onSubmit?.(values, extraInfos);
+        } catch (err) {
+          finish(false);
+          throw err;
+        }
+        if (res && res.then) {
+          return res.then(
+            (isSuccess?: boolean) => {
+              if (isFormMounted.current) {
+                // Assuming isSuccess to be true by default
+                if (isSuccess !== false) {
+                  // Make initial values same as final values in order to set isDirty as false after submit
+                  updateInitialValues(
+                    props?.reinitializeOnSubmit
+                      ? (initialValues ?? {})
+                      : values,
+                    { skipUnregister, skipUnusedInitialValues },
+                    props?.reinitializeOnSubmit ? {} : extraInfos
+                  );
+                }
+                finish(isSuccess !== false);
+              }
+              return isSuccess;
+            },
+            () => {
+              if (isFormMounted.current) {
+                finish(false);
+              }
+            }
+          );
+        }
+        finish(true);
         updateInitialValues(
           props?.reinitializeOnSubmit ? (initialValues ?? {}) : values,
           { skipUnregister, skipUnusedInitialValues },
           props?.reinitializeOnSubmit ? {} : extraInfos
         );
+        return res;
+      };
+
+      if (collector.hasPending) {
+        setSubmitState({ isValidatingSubmit: true });
+        return collector.settled().then(submitIfValid);
       }
-      return res;
+      return submitIfValid();
     },
     [
-      validateAllFieldsInternal,
+      runValidation,
       onSubmit,
       onError,
       validate,
       updateInitialValues,
       skipUnregister,
+      skipUnusedInitialValues,
       formId,
+      store,
       getValuesAndExtraInfo,
+      setSubmitState,
     ]
   );
-
-  const validateAllFields = useCallback(() => {
-    const { values, extraInfos } = getValuesAndExtraInfo();
-    const errors = validateAllFieldsInternal(values, extraInfos);
-    return errors;
-  }, [getValuesAndExtraInfo, validateAllFieldsInternal]);
 
   return {
     handleSubmit,
@@ -1433,8 +2372,11 @@ export function useForm(props: IFormProps) {
     handleReset,
     resetInitialValues,
     validateFields,
+    validateFieldsAsync,
     validateAllFields,
+    validateAllFieldsAsync,
     getValues: getValuesAndExtraInfo,
+    ...useFormErrorActions(formId),
   };
 }
 

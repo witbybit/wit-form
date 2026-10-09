@@ -1,0 +1,33 @@
+---
+title: 'Schema Rules'
+description: 'Validate the whole form with one Zod schema. Errors appear on the matching fields, including fields inside field array rows, and rules across fields become form errors.'
+---
+
+import SchemaRules from '@/examples/validation/SchemaValidation';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <SchemaRules />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/validation/SchemaValidation.tsx"'
+    >
+      examples/validation/SchemaValidation.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+- `useForm({ schema })` takes any [Standard Schema](https://standardschema.dev): Zod, Valibot, ArkType, Effect Schema, or Yup 1.7 and newer. There's no adapter to install. See [Schema validation](/docs/guides/validation#schema-validation).
+- Each issue goes to the field at its path. `travelers[1].age` lands on the age field of the second traveler row, and `contact.email` on the email field.
+- An issue for the list itself ("Add at least one traveler") becomes the field array's `error`. Remove every traveler to see it.
+- The `.refine` rule has no path, so it becomes a form error. The form shows it from `formState.formErrors`.
+- The schema runs again as values change, so errors clear as soon as you fix them. As with any error, a field shows its error once it's touched.
+
+The `TextField` and `NumberField` components come from the [shared example components](/docs/examples#shared-components).

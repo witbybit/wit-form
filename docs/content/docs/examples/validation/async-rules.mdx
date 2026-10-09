@@ -1,0 +1,32 @@
+---
+title: 'Async Rules'
+description: 'Check a username against the server while the user types, and show errors that only the server can find after a submit.'
+---
+
+import AsyncRules from '@/examples/validation/AsyncValidation';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <AsyncRules />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include
+      cwd
+      lang="tsx"
+      meta='title="examples/validation/AsyncValidation.tsx"'
+    >
+      examples/validation/AsyncValidation.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+- `validateUsername` is an `async` function. While it runs, the field's `isValidating` is `true` and the field shows "Checking…". See [Async validation](/docs/guides/validation#async-validation).
+- `debounceValidation={400}` waits until typing pauses for 400 ms before validating, so the server isn't asked about every keystroke. If an older check finishes after a newer one, its result is ignored.
+- On submit, `handleSubmit` waits for pending async validators before calling `onSubmit`. The button reads `formState.isValidating` and `formState.isSubmitting` to show what's happening.
+- The server rejects `@example.com` addresses. `onSubmit` shows that error on the email field with `setError`, and returns `false` so the edits are kept. See [Errors from the server](/docs/guides/validation#errors-from-the-server).
+
+The `TextField` component comes from the [shared example components](/docs/examples#shared-components).

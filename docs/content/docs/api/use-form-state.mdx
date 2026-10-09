@@ -1,0 +1,68 @@
+---
+title: 'useFormState'
+description: 'useFormState reads the form state (isValid, isDirty, isSubmitting, errors and more) from any component inside the form. A component re-renders only when a property it reads changes.'
+---
+
+```ts
+import { useFormState } from 'wit-form';
+
+const formState = useFormState({ formId });
+```
+
+It returns the same object as [`useForm`'s `formState`](/docs/api/use-form#formstate), for components other than the one that calls `useForm`, like a submit button or an error summary:
+
+```tsx
+function SubmitButton() {
+  const { isSubmitting, isValidating } = useFormState();
+  return (
+    <button type="submit" disabled={isSubmitting || isValidating}>
+      {isSubmitting ? 'Saving…' : 'Save'}
+    </button>
+  );
+}
+
+function ErrorSummary() {
+  const { errors, formErrors, isSubmitted } = useFormState();
+  if (!isSubmitted || (!errors.length && !formErrors.length)) return null;
+  return (
+    <ul role="alert">
+      {errors.map((e) => (
+        <li key={e.name}>
+          {e.name}: {e.error}
+        </li>
+      ))}
+      {formErrors.map((message) => (
+        <li key={message}>{message}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## Only what you read
+
+Reading a property subscribes to it. `SubmitButton` above reads `isSubmitting` and `isValidating`, so typing in a field doesn't re-render it. It re-renders when one of those two values changes. Destructure only what you need.
+
+## Options
+
+### `formId`
+
+**Type:** `string` · **Default:** the surrounding form
+
+Only for reading a form from outside its provider. See [FormProvider](/docs/api/form-provider#using-a-form-outside-its-provider).
+
+## Returns
+
+| Property             | Type            | Description                                                                                  |
+| -------------------- | --------------- | -------------------------------------------------------------------------------------------- |
+| `isSubmitting`       | `boolean`       | `onSubmit` is running.                                                                       |
+| `isSubmitted`        | `boolean`       | The form has been submitted at least once, whether or not it was valid.                      |
+| `isSubmitSuccessful` | `boolean`       | The last submit passed validation and `onSubmit` didn't resolve to `false` or reject.        |
+| `submitCount`        | `number`        | How many times the form has been submitted.                                                  |
+| `isValidating`       | `boolean`       | An async validator is running, for a field, a field array or a submit.                       |
+| `isValid`            | `boolean`       | No field or field array has an error, and the form schema passes.                            |
+| `isDirty`            | `boolean`       | The values differ from the initial values.                                                   |
+| `errors`             | `IFieldError[]` | Every current field and field array error, including ones not shown yet.                     |
+| `formErrors`         | `string[]`      | Form-level errors from the last submit (`validate` and schema), or set with `setFormErrors`. |
+
+`isValid` doesn't include the form-level `validate`, which only runs on submit.

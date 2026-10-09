@@ -41,6 +41,8 @@ function TextField(props: { name: string; label: string }) {
 useField<string, { label: string }>({ name: 'country' });
 ```
 
+To have TypeScript check the field's **name** too, and infer the value type from it, use the hooks from [`createFormHooks`](/docs/api/create-form-hooks).
+
 ## Options
 
 ### `name`
@@ -76,9 +78,11 @@ The value to use when `initialValues` has none for this field. In field arrays, 
 
 ### `validate`
 
-**Type:** `(value: Value | undefined, other?: { values: any; extraInfos: any }) => string | null | undefined` · **Default:** none
+**Type:** `(value: Value | undefined, other?: { values: any; extraInfos: any }) => string | null | undefined | Promise<...>` · **Default:** none
 
-Returns an error message, or `null`/`undefined` when the value is valid. Runs on every change, and for all fields on submit.
+Returns an error message, or `null`/`undefined` when the value is valid. Runs when the field mounts, on every change, and for all fields on submit.
+
+It can be `async` (return a promise), for checks that need the server. While it runs, `isValidating` is `true`. Results of older runs that finish late are ignored. If it throws or the promise rejects, the error's message becomes the field's error. See [Async validation](/docs/guides/validation#async-validation).
 
 - `value` is the field's current value.
 - `other.values` contains the fields listed in `depFields` while editing, and **all** form values during submit and `validateFields`.
@@ -100,6 +104,32 @@ useField({ name: 'quantity', validateCallback });
 ```
 
 When both are given, `validateCallback` is used.
+
+### `schema`
+
+**Type:** `StandardSchemaV1` · **Default:** none
+
+A schema for this field's value, from any [Standard Schema](https://standardschema.dev) library (Zod, Valibot, ArkType, ...). The first issue's message becomes the error. When `validate` is also given, it only runs once the schema passes.
+
+```tsx
+useField({ name: 'email', schema: z.email('Enter a valid email') });
+```
+
+Like `validate`, it's read once, when the field mounts.
+
+### `debounceValidation`
+
+**Type:** `number` (milliseconds) · **Default:** none
+
+Waits until the value hasn't changed for this long before validating. Use it with async validators, so the server isn't asked on every keystroke. `isValidating` is `true` while waiting. A submit validates right away, without waiting.
+
+```tsx
+useField({
+  name: 'username',
+  validate: checkUsername,
+  debounceValidation: 400,
+});
+```
 
 ### `depFields`
 
@@ -152,7 +182,9 @@ The field's current extra info.
 
 **Type:** `string | null | undefined`
 
-The validation error, **only once the field is touched**. Before that it's `undefined`, even if the value is invalid. This keeps errors from appearing while the user is still filling in the field for the first time.
+The validation error, once it's visible. With the default [`mode`](/docs/api/use-form#mode), that's **once the field is touched**. Before that it's `undefined`, even if the value is invalid. This keeps errors from appearing while the user is still filling in the field for the first time.
+
+The error comes from the field's own `validate` or `schema`, from the form [`schema`](/docs/api/use-form#schema), or from `setError`.
 
 ### `touched`
 
@@ -165,6 +197,28 @@ Whether the field has been touched: blurred, submitted, or validated with `valid
 **Type:** `() => void`
 
 Marks the field as touched. Pass it to your input's `onBlur`, or errors only appear after a submit.
+
+### `isValidating`
+
+**Type:** `boolean`
+
+`true` while an async validator runs, or while a debounced validation waits. Use it to show a spinner.
+
+### `isDirty`
+
+**Type:** `boolean`
+
+Whether the value differs from the field's initial value: its value in `initialValues`, or its `defaultValue` when there is none.
+
+### `ref`
+
+**Type:** `(element: any) => void`
+
+Attach it to the input element. When a submit fails, the form focuses the first invalid field whose `ref` is attached (see [`shouldFocusError`](/docs/api/use-form#shouldfocuserror)). It also lets `setFocus` focus this field.
+
+```tsx
+<input ref={ref} value={fieldValue ?? ''} onChange={...} />
+```
 
 ## Notes
 

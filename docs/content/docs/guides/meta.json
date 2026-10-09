@@ -2,6 +2,7 @@
   "title": "Guides",
   "pages": [
     "validation",
+    "type-safety",
     "field-arrays",
     "watching-values",
     "loading-and-saving",

@@ -57,7 +57,15 @@ Pass a function as the child to control rendering yourself. Here `onChange` take
 </Field>
 ```
 
-The render function receives the same props as the child element. The difference is that `onChange(value, extraInfo?)` works like `setFieldValue` from `useField`.
+The render function receives the same props as the child element, plus:
+
+| Prop           | Type                     | Description                                             |
+| -------------- | ------------------------ | ------------------------------------------------------- |
+| `isValidating` | `boolean`                | An async validator is running.                          |
+| `isDirty`      | `boolean`                | The value differs from the initial value.               |
+| `ref`          | `(element: any) => void` | Attach it to the input so a failed submit can focus it. |
+
+The other difference is that `onChange(value, extraInfo?)` works like `setFieldValue` from `useField`.
 
 ## Props
 
@@ -84,6 +92,10 @@ Adds a "Required" error when the value is empty. Only used when there is no `val
 **Type:** `(value, other?) => string | null | undefined` · **Default:** none
 
 A validator, like [`useField`'s `validate`](/docs/api/use-field#validate). When given, `required` is ignored.
+
+### `validateCallback`, `schema`, `debounceValidation`, `skipUnregister`
+
+The same as the [`useField` options](/docs/api/use-field#options) of the same names.
 
 ### `depFields`
 
@@ -113,8 +125,7 @@ Called with the new value after each change, **in child element mode only**. Use
 
 `<Field>` covers the common cases. Use `useField` directly when you need:
 
-- `validateCallback` or `skipUnregister`, which `<Field>` doesn't accept;
-- typed values (`useField<number>`);
+- typed values (`useField<number>`), or checked names (`createFormHooks` also has a typed `Field`);
 - a reusable input component that's used across many forms.
 
 See both styles in the [Field Component example](/docs/examples/getting-started/field-component).

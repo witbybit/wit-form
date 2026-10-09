@@ -36,12 +36,12 @@ const features: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Layers,
     title: 'Field arrays',
-    body: 'Add, insert and remove rows, including lists inside lists, with stable row ids.',
+    body: 'Add, insert, move, swap and remove rows, including lists inside lists, with stable row ids.',
   },
   {
     icon: ShieldCheck,
     title: 'Validation at every level',
-    body: 'Per field, per list and form-wide, with rules that depend on other fields or on props.',
+    body: 'Per field, per list and form-wide. Plain functions or any Standard Schema (Zod, Valibot, ArkType), sync or async with debouncing.',
   },
   {
     icon: Puzzle,
@@ -51,12 +51,12 @@ const features: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Workflow,
     title: 'Real-world workflows',
-    body: 'Initial values, unsaved-change tracking, resets, async submit and multi-step wizards.',
+    body: 'Initial values, form state flags, server errors, focus on the first invalid field, resets and multi-step wizards.',
   },
   {
     icon: Package,
-    title: 'Small and typed',
-    body: 'About 7 kB gzipped, ESM-only, with TypeScript types included. React and Jotai are the only peers.',
+    title: 'Small and type-safe',
+    body: 'About 10 kB gzipped, ESM-only. createFormHooks type-checks every field name and value. React and Jotai are the only peers.',
   },
 ];
 
