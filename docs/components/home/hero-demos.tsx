@@ -23,8 +23,9 @@ const demos: { key: HeroDemoKey; label: string; caption: string }[] = [
   },
   {
     key: 'comparison',
-    label: 'Why it’s fast',
-    caption: 'The same keystrokes, sent to one state object and to Wit Form.',
+    label: 'Fewer re-renders',
+    caption:
+      'The same keystrokes in two forms. One state object re-renders every field, Wit Form only the one you typed in.',
   },
   {
     key: 'complex',

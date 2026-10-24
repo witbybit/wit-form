@@ -30,7 +30,7 @@ function PayrollTotal() {
 }`,
   },
   comparison: {
-    file: 'why-its-fast.tsx',
+    file: 'fewer-re-renders.tsx',
     code: `// One state object: every field reads the whole form,
 // so a keystroke in one field re-renders all of them
 function SharedField({ name }: { name: string }) {

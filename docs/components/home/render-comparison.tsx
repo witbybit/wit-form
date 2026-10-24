@@ -33,20 +33,7 @@ const BASE_FIELDS: DemoField[] = [
   { name: 'team', label: 'Team size', value: '11–50' },
 ];
 
-// Big enough by default for the gap to show at a glance; the verdict offers 1,000
-const DEFAULT_COUNT = 100;
-const LARGE_COUNT = 1000;
-
-function makeFields(count: number): DemoField[] {
-  const extra = Array.from(
-    { length: Math.max(0, count - BASE_FIELDS.length) },
-    (_, i) => {
-      const n = BASE_FIELDS.length + i + 1;
-      return { name: `field${n}`, label: `Field ${n}`, value: `Value ${n}` };
-    }
-  );
-  return [...BASE_FIELDS.slice(0, count), ...extra];
-}
+const FIELDS = BASE_FIELDS;
 
 const valuesOf = (fields: DemoField[]) =>
   Object.fromEntries(fields.map((field) => [field.name, field.value]));
@@ -65,7 +52,6 @@ const FLASH = {
 function createDemoStore() {
   const empty = { keystrokes: 0, shared: 0, atoms: 0, sharedMs: 0, atomsMs: 0 };
   let snapshot = empty;
-  let fields = makeFields(DEFAULT_COUNT);
   // Renders while the forms mount or restore aren't the visitor's doing, so they don't count
   let settling: ReturnType<typeof setTimeout> | undefined;
   let afterSettle: (() => void) | undefined;
@@ -158,15 +144,10 @@ function createDemoStore() {
       }
       type(name, value);
     },
-    /** Switches both forms to a new number of fields; they remount with fresh values */
-    resize(count: number) {
-      fields = makeFields(count);
-      settle();
-    },
     /** Puts every field back to its starting value, then zeroes the tallies */
     restore(then?: () => void) {
       settle(then);
-      for (const field of fields) {
+      for (const field of FIELDS) {
         setters.forEach((set) => set(field.name, field.value));
       }
     },
@@ -274,7 +255,7 @@ function FieldBox(props: {
   );
 }
 
-/** The Name field on top, the rest in a scroll box, so bigger forms don't stretch the page */
+/** The Name field on top, full width, and the other fields in two columns below it */
 function FieldGrid(props: {
   fields: DemoField[];
   render: (field: DemoField) => ReactNode;
@@ -283,9 +264,7 @@ function FieldGrid(props: {
   return (
     <div className="flex flex-col gap-2">
       {props.render(first)}
-      <div className="grid max-h-[13.5rem] grid-cols-2 gap-2 overflow-y-auto">
-        {rest.map(props.render)}
-      </div>
+      <div className="grid grid-cols-2 gap-2">{rest.map(props.render)}</div>
     </div>
   );
 }
@@ -477,27 +456,14 @@ function Toolbar() {
   );
 }
 
-/** The punchline: the same keystrokes, side by side, in one sentence, with the size switch */
-function Verdict(props: { count: number; onResize: (count: number) => void }) {
+/** The punchline: the same keystrokes, side by side, in one sentence */
+function Verdict() {
   const tally = useTally();
-  const large = props.count >= LARGE_COUNT;
-  const resize = (
-    <button
-      type="button"
-      onClick={() => props.onResize(large ? DEFAULT_COUNT : LARGE_COUNT)}
-      className="font-medium text-emerald-700 underline decoration-emerald-500/40 underline-offset-4 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-300"
-    >
-      {large
-        ? `Back to ${DEFAULT_COUNT} fields`
-        : `Try ${LARGE_COUNT.toLocaleString('en-US')} fields`}
-    </button>
-  );
   if (tally.keystrokes === 0) {
     return (
       <p className="text-center text-sm text-pretty text-fd-muted-foreground">
-        Each form has {props.count.toLocaleString('en-US')} fields. Type in
-        either one: keystrokes go to both, and the counters are real React
-        renders. {resize}
+        Each form has {FIELDS.length} fields. Type in either one: keystrokes go
+        to both, and the counters are real React renders.
       </p>
     );
   }
@@ -512,15 +478,13 @@ function Verdict(props: { count: number; onResize: (count: number) => void }) {
       <span className="font-mono font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
         {tally.atoms.toLocaleString('en-US')}
       </span>{' '}
-      with Wit Form. {resize}
+      with Wit Form.
     </p>
   );
 }
 
 export function RenderComparison() {
   const [store] = useState(createDemoStore);
-  const [count, setCount] = useState(DEFAULT_COUNT);
-  const fields = useMemo(() => makeFields(count), [count]);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Mounting renders every field a few times, which says nothing about typing.
@@ -551,12 +515,6 @@ export function RenderComparison() {
     return () => observer.disconnect();
   }, [store]);
 
-  const resize = (size: number) => {
-    if (size === count) return;
-    store.resize(size);
-    setCount(size);
-  };
-
   return (
     <div ref={rootRef} className="relative">
       <div
@@ -575,7 +533,7 @@ export function RenderComparison() {
               title="Every field wakes up"
               body="Values live in one object, so each keystroke hands every field a new copy and they all render again, unless you add memo and selectors."
             >
-              <SharedForm key={count} fields={fields} />
+              <SharedForm fields={FIELDS} />
             </Panel>
             <Panel
               side="atoms"
@@ -583,11 +541,11 @@ export function RenderComparison() {
               title="Only the field you touched"
               body="The input writes to its own atom. The rest of the form never hears about it, and there is nothing to memoize."
             >
-              <AtomForm key={count} fields={fields} />
+              <AtomForm fields={FIELDS} />
             </Panel>
           </div>
           <div className="border-t px-4 py-3 sm:px-5">
-            <Verdict count={count} onResize={resize} />
+            <Verdict />
           </div>
         </div>
       </DemoContext.Provider>
