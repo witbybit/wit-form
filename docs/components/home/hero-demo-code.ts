@@ -1,32 +1,38 @@
 /** The code behind each hero demo, trimmed to the part that matters. Shown by "View code". */
 export const heroDemoCode = {
-  payroll: {
-    file: 'payroll.tsx',
+  sheet: {
+    file: 'budget-sheet.tsx',
     code: `import { useField, useFieldArrayColumnWatch, useFieldWatch } from 'wit-form';
 
-// Each input subscribes to its own field
-function BonusInput({ rowId }: { rowId: number }) {
-  const ancestors = useMemo(() => [{ name: 'lines', rowId }], [rowId]);
-  const { fieldValue, setFieldValue } = useField<number>({ name: 'bonus', ancestors });
-  return <input value={fieldValue ?? ''} onChange={(e) => setFieldValue(+e.target.value)} />;
+// Every cell is a field in its row: text, select, number or checkbox
+function RemoteCell({ rowId }: { rowId: number }) {
+  const ancestors = useMemo(() => [{ name: 'people', rowId }], [rowId]);
+  const { fieldValue, setFieldValue } = useField<boolean>({ name: 'remote', ancestors });
+  return (
+    <input
+      type="checkbox"
+      checked={!!fieldValue}
+      onChange={(e) => setFieldValue(e.target.checked)}
+    />
+  );
 }
 
 // Re-renders only when this row's salary or bonus changes
 function RowTotal({ rowId }: { rowId: number }) {
-  const ancestors = [{ name: 'lines', rowId }];
+  const ancestors = [{ name: 'people', rowId }];
   const { values } = useFieldWatch({
     fieldNames: [{ name: 'salary', ancestors }, { name: 'bonus', ancestors }],
   });
   return <span>{values.salary + values.bonus}</span>;
 }
 
-// Re-renders when a salary or bonus changes, in any row
-function PayrollTotal() {
+// Re-renders only when a box in the remote column changes
+function RemoteCount() {
   const { values } = useFieldArrayColumnWatch({
-    fieldArrayName: 'lines',
-    fieldNames: ['salary', 'bonus'],
+    fieldArrayName: 'people',
+    fieldNames: ['remote'],
   });
-  return <strong>{values.reduce((sum, l) => sum + l.salary + l.bonus, 0)}</strong>;
+  return <span>{values.filter((row) => row.remote).length}</span>;
 }`,
   },
   comparison: {

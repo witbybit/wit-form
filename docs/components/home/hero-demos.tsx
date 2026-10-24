@@ -10,9 +10,9 @@ import {
 } from 'react';
 import { cn } from '@/lib/cn';
 import type { HeroDemoKey } from './hero-demo-code';
-import { PayrollDemo } from './payroll-demo';
 import { Window } from './primitives';
 import { RenderComparison } from './render-comparison';
+import { SheetDemo } from './sheet-demo';
 import { TripDemo } from './trip-demo';
 
 const demos: { key: HeroDemoKey; label: string; caption: string }[] = [
@@ -23,9 +23,10 @@ const demos: { key: HeroDemoKey; label: string; caption: string }[] = [
       'The same keystrokes in two forms. One state object re-renders every field, Wit Form only the one you typed in.',
   },
   {
-    key: 'payroll',
-    label: 'Big forms',
-    caption: 'A 500-person payroll. A keystroke renders 3 of 1,501 components.',
+    key: 'sheet',
+    label: 'Large tables',
+    caption:
+      'A 500-row sheet of text, selects, numbers and checkboxes. Each edit renders only what depends on it.',
   },
   {
     key: 'complex',
@@ -110,8 +111,8 @@ export function HeroDemos(props: {
               {props.code[demo.key].code}
             </div>
           </Window>
-        ) : demo.key === 'payroll' ? (
-          <PayrollDemo />
+        ) : demo.key === 'sheet' ? (
+          <SheetDemo />
         ) : demo.key === 'comparison' ? (
           <RenderComparison />
         ) : (
