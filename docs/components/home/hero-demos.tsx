@@ -9,11 +9,11 @@ import {
   type ReactNode,
 } from 'react';
 import { cn } from '@/lib/cn';
+import { ApplyDemo } from './apply-demo';
 import type { HeroDemoKey } from './hero-demo-code';
 import { Window } from './primitives';
 import { RenderComparison } from './render-comparison';
 import { SheetDemo } from './sheet-demo';
-import { TripDemo } from './trip-demo';
 
 const demos: { key: HeroDemoKey; label: string; caption: string }[] = [
   {
@@ -32,7 +32,7 @@ const demos: { key: HeroDemoKey; label: string; caption: string }[] = [
     key: 'complex',
     label: 'Complex forms',
     caption:
-      'Three steps, one form: strings, numbers, booleans, lists and nested objects, checked step by step.',
+      'A three-step job application: text, email, a select, chips, a slider, a list, a file, a date, checkboxes and nested objects.',
   },
 ];
 
@@ -116,7 +116,7 @@ export function HeroDemos(props: {
         ) : demo.key === 'comparison' ? (
           <RenderComparison />
         ) : (
-          <TripDemo />
+          <ApplyDemo />
         )}
       </div>
       <p className="text-center text-sm text-fd-muted-foreground">

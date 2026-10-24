@@ -52,10 +52,10 @@ function Field({ name }: { name: string }) {
 }`,
   },
   complex: {
-    file: 'booking-wizard.tsx',
+    file: 'job-application.tsx',
     code: `// One form across three steps. Steps that aren't shown keep their values.
 const { handleSubmit, validateFields } = useForm({
-  schema: bookingSchema,
+  schema: applicationSchema,
   skipUnregister: true,
   onSubmit,
 });
@@ -66,25 +66,20 @@ const next = () => {
 };
 
 // Any kind of value, in any shape
-useField<string>({ name: 'destination' });
-useField<number>({ name: 'nights' });
-useField<boolean>({ name: 'flexibleDates' });
-useField<string[]>({ name: 'extras' });
 useField<string>({ name: 'contact.email' }); // { contact: { email } }
+useField<string>({ name: 'country' }); // a select
+useField<number>({ name: 'years' }); // a slider
+useField<string[]>({ name: 'skills' }); // toggle chips
+useField<boolean>({ name: 'terms' }); // a checkbox
+
+// A file: keep its name and size as the value, the File itself as extra info
+const resume = useField<{ name: string; size: number }, { file: File }>({ name: 'resume' });
+resume.setFieldValue({ name: file.name, size: file.size }, { file });
 
 // A list of rows, each with its own fields
-const { fieldArrayProps, append, swap, remove } = useFieldArray({
-  name: 'travelers',
-  fieldNames: ['name', 'age', 'passport'],
-});
-
-// Only asked for trips abroad, with a rule that reads the destination
-useField({
-  name: 'passport',
-  ancestors,
-  depFields: ['destination'],
-  validate: (value, other) =>
-    isAbroad(other?.values.destination) && !value ? 'Needed abroad' : null,
+const { fieldArrayProps, append, remove } = useFieldArray({
+  name: 'history',
+  fieldNames: ['company', 'title'],
 });`,
   },
 } as const;
