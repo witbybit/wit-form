@@ -19,6 +19,7 @@ import {
 } from 'wit-form';
 import { z } from 'zod';
 import { cn } from '@/lib/cn';
+import { DemoControls } from './demo-controls';
 
 const countries = [
   { value: 'us', label: 'United States' },
@@ -791,18 +792,26 @@ function typeInto(
 }
 
 export function ApplyDemo() {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  // Each Play bumps the run and remounts a fresh form; 0 means nothing is running
+  const [run, setRun] = useState(0);
+  const [formKey, setFormKey] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const stopRef = useRef(() => {});
+
+  // Plays once on its own, unless the visitor prefers reduced motion
+  useEffect(() => {
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setRun(1);
+    }
+  }, []);
 
   // A scripted visit that runs into validation twice, fixes it and submits:
   // profile, experience with an empty position, then finish with missing fields
   useEffect(() => {
-    const root = rootRef.current;
-    if (
-      !root ||
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
-      return;
-    }
+    const root = formRef.current;
+    if (!root || run === 0) return;
+    setPlaying(true);
     const timers: ReturnType<typeof setTimeout>[] = [];
     let stopped = false;
     let time = 600;
@@ -858,20 +867,37 @@ export function ApplyDemo() {
     });
     type('[data-field="coverLetter"]', 'I build compilers and teach.');
     then(500, () => click('[data-field="terms"]'));
-    then(900, () => click('button[type="submit"]'));
+    then(900, () => {
+      click('button[type="submit"]');
+      setPlaying(false);
+    });
 
     const stop = () => {
       stopped = true;
       timers.forEach(clearTimeout);
+      root.removeEventListener('pointerdown', stop);
+      root.removeEventListener('keydown', stop);
+      setPlaying(false);
     };
-    // Only the visitor's own pointer or keys take over; the script's clicks and focus don't
-    root.addEventListener('pointerdown', stop, { once: true });
-    root.addEventListener('keydown', stop, { once: true });
+    stopRef.current = stop;
+    // Only the visitor's own pointer or keys in the form take over; the script's clicks don't
+    root.addEventListener('pointerdown', stop);
+    root.addEventListener('keydown', stop);
     return stop;
-  }, []);
+  }, [run]);
+
+  const play = () => {
+    setFormKey((key) => key + 1);
+    setRun((count) => count + 1);
+  };
+  const reset = () => {
+    stopRef.current();
+    setRun(0);
+    setFormKey((key) => key + 1);
+  };
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <div
         aria-hidden
         className="absolute -inset-x-8 -inset-y-6 -z-10 rounded-[2.5rem] bg-gradient-to-b from-emerald-500/15 via-teal-500/5 to-transparent blur-2xl"
@@ -886,10 +912,18 @@ export function ApplyDemo() {
           <span className="truncate font-mono text-xs text-fd-muted-foreground">
             acme.jobs/apply
           </span>
+          <DemoControls
+            playing={playing}
+            onPlay={play}
+            onPause={() => stopRef.current()}
+            onReset={reset}
+          />
         </div>
-        <FormProvider>
-          <ApplicationWizard />
-        </FormProvider>
+        <div ref={formRef}>
+          <FormProvider key={formKey}>
+            <ApplicationWizard />
+          </FormProvider>
+        </div>
       </div>
     </div>
   );

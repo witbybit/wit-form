@@ -1,6 +1,5 @@
 'use client';
 
-import { Play, RotateCcw } from 'lucide-react';
 import {
   type ReactNode,
   createContext,
@@ -14,6 +13,7 @@ import {
 import { flushSync } from 'react-dom';
 import { FormProvider, useField, useForm, useFormContext } from 'wit-form';
 import { cn } from '@/lib/cn';
+import { DemoControls } from './demo-controls';
 
 type Side = 'shared' | 'atoms';
 type DemoField = { name: string; label: string; sample: string };
@@ -53,6 +53,7 @@ function createDemoStore() {
   let settling: ReturnType<typeof setTimeout> | undefined;
   let afterSettle: (() => void) | undefined;
   let playback: ReturnType<typeof setInterval> | undefined;
+  let playing = false;
   const listeners = new Set<() => void>();
   const setters = new Map<Side, (name: string, value: string) => void>();
   const notify = () => listeners.forEach((listener) => listener());
@@ -60,6 +61,10 @@ function createDemoStore() {
   const stopPlayback = () => {
     clearInterval(playback);
     playback = undefined;
+    if (playing) {
+      playing = false;
+      notify();
+    }
   };
 
   const reset = () => {
@@ -115,6 +120,7 @@ function createDemoStore() {
     },
     getSnapshot: () => snapshot,
     getServerSnapshot: () => empty,
+    isPlaying: () => playing,
     bump(side: Side) {
       if (settling) {
         scheduleSettle();
@@ -150,6 +156,8 @@ function createDemoStore() {
     },
     play() {
       this.restore(() => {
+        playing = true;
+        notify();
         // Every keystroke of the whole form, in order
         const keys = FIELDS.flatMap((field) =>
           [...field.sample].map((_, i) => [
@@ -164,6 +172,10 @@ function createDemoStore() {
           if (next === keys.length) stopPlayback();
         }, 45);
       });
+    },
+    /** Stops typing where it is */
+    pause() {
+      stopPlayback();
     },
     stop() {
       stopPlayback();
@@ -433,29 +445,24 @@ function StickyTally() {
 
 function Toolbar() {
   const store = useDemo();
+  const playing = useSyncExternalStore(
+    store.subscribe,
+    store.isPlaying,
+    () => false
+  );
   return (
-    <div className="flex items-center justify-between gap-3 border-b bg-fd-muted/40 px-4 py-2.5 sm:px-5">
+    <div className="flex items-center gap-3 border-b bg-fd-muted/40 px-4 py-2.5">
       <div className="flex gap-1.5" aria-hidden>
         <span className="size-2.5 rounded-full bg-fd-foreground/15" />
         <span className="size-2.5 rounded-full bg-fd-foreground/15" />
         <span className="size-2.5 rounded-full bg-fd-foreground/15" />
       </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => store.play()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-fd-background px-3 text-xs font-medium transition outline-none hover:bg-fd-accent focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98]"
-        >
-          <Play className="size-3.5" /> Type for me
-        </button>
-        <button
-          type="button"
-          onClick={() => store.restore()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-fd-muted-foreground transition outline-none hover:bg-fd-accent hover:text-fd-foreground focus-visible:ring-2 focus-visible:ring-emerald-500"
-        >
-          <RotateCcw className="size-3.5" /> Reset
-        </button>
-      </div>
+      <DemoControls
+        playing={playing}
+        onPlay={() => store.play()}
+        onPause={() => store.pause()}
+        onReset={() => store.restore()}
+      />
     </div>
   );
 }

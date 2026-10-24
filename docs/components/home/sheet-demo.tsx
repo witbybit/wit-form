@@ -25,6 +25,7 @@ import {
   useFormContext,
 } from 'wit-form';
 import { cn } from '@/lib/cn';
+import { DemoControls } from './demo-controls';
 
 const ROWS = 500;
 // The first rows mount at once, enough to fill the view; the rest follow in batches
@@ -109,7 +110,14 @@ const script: { row: number; column: Column; values: Value[] }[] = [
  * and runs the autoplay cursor. Nothing here is part of wit-form.
  */
 function createInspector() {
-  let stats = { rendered: 0, ms: 0, edits: 0, components: componentsFor(ROWS) };
+  const emptyStats = {
+    rendered: 0,
+    ms: 0,
+    edits: 0,
+    components: componentsFor(ROWS),
+  };
+  let stats = emptyStats;
+  let playing = false;
   let ready = false;
   let commits = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -123,6 +131,11 @@ function createInspector() {
       return () => listeners.delete(listener);
     },
     getStats: () => stats,
+    isPlaying: () => playing,
+    resetStats() {
+      stats = emptyStats;
+      notify();
+    },
     /** Whether commits come from editing (and count and flash), not from mounting */
     get ready() {
       return ready;
@@ -151,6 +164,9 @@ function createInspector() {
       });
     },
     play(root: HTMLElement) {
+      inspector.stop(root);
+      playing = true;
+      notify();
       let step = 0;
       const run = () => {
         // Not before every row has mounted, so mounting never counts as an edit
@@ -183,6 +199,10 @@ function createInspector() {
     stop(root?: HTMLElement | null) {
       clearTimeout(timer);
       root?.querySelector('[data-typing]')?.removeAttribute('data-typing');
+      if (playing) {
+        playing = false;
+        notify();
+      }
     },
   };
   return inspector;
@@ -559,26 +579,39 @@ function InspectorBar() {
 
 export function SheetDemo() {
   const [inspector] = useState(createInspector);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  // Reset remounts a fresh form: values back, deleted rows back
+  const [formKey, setFormKey] = useState(0);
+  const playing = useSyncExternalStore(
+    inspector.subscribe,
+    inspector.isPlaying,
+    inspector.isPlaying
+  );
 
   // The tab mounts this when it's already on screen; the cursor starts once every row is in
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    if (!reducedMotion()) inspector.play(root);
-    // Only the visitor's own pointer or keys take over from the cursor
-    const stop = () => inspector.stop(root);
-    root.addEventListener('pointerdown', stop);
-    root.addEventListener('keydown', stop);
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    if (!reducedMotion()) inspector.play(sheet);
+    // Only the visitor's own pointer or keys in the sheet take over from the cursor
+    const stop = () => inspector.stop(sheet);
+    sheet.addEventListener('pointerdown', stop);
+    sheet.addEventListener('keydown', stop);
     return () => {
-      root.removeEventListener('pointerdown', stop);
-      root.removeEventListener('keydown', stop);
+      sheet.removeEventListener('pointerdown', stop);
+      sheet.removeEventListener('keydown', stop);
       stop();
     };
   }, [inspector]);
 
+  const reset = () => {
+    inspector.stop(sheetRef.current);
+    inspector.resetStats();
+    setFormKey((key) => key + 1);
+  };
+
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <div
         aria-hidden
         className="absolute -inset-x-8 -inset-y-6 -z-10 rounded-[2.5rem] bg-gradient-to-b from-emerald-500/15 via-teal-500/5 to-transparent blur-2xl"
@@ -594,11 +627,21 @@ export function SheetDemo() {
             <span className="truncate font-mono text-xs text-fd-muted-foreground">
               acme.app/budget
             </span>
+            <DemoControls
+              playing={playing}
+              onPlay={() =>
+                sheetRef.current && inspector.play(sheetRef.current)
+              }
+              onPause={() => inspector.stop(sheetRef.current)}
+              onReset={reset}
+            />
           </div>
-          {/* Nothing here reads the whole form's values, so that tracking can stay off */}
-          <FormProvider options={{ skipValuesObserver: true }}>
-            <Sheet />
-          </FormProvider>
+          <div ref={sheetRef}>
+            {/* Nothing here reads the whole form's values, so that tracking can stay off */}
+            <FormProvider key={formKey} options={{ skipValuesObserver: true }}>
+              <Sheet />
+            </FormProvider>
+          </div>
           <InspectorBar />
         </div>
       </InspectorContext.Provider>
