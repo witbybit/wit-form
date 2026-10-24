@@ -1,6 +1,9 @@
 import { createGetUrl } from 'fumadocs-core/source';
+import pkg from '../../package.json';
 
 export const appName = 'Wit Form';
+/** The library's version, read from its package.json so the site never shows a stale one */
+export const libVersion = pkg.version;
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
 export const docsContentRoute = '/llms.mdx/docs';

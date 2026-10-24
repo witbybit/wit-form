@@ -1,0 +1,146 @@
+{
+  "date": "2026-10-24",
+  "environment": {
+    "cpu": "AMD Ryzen 5 220 w/ Radeon 740M Graphics",
+    "cpuSlowdown": 4,
+    "browser": "Chrome 155.0.8059.39",
+    "runs": 5,
+    "keystrokes": 21
+  },
+  "versions": {
+    "wit-form": "0.2.0",
+    "react-hook-form": "7.90.0",
+    "@tanstack/react-form": "1.33.5",
+    "react": "19.3.1"
+  },
+  "results": [
+    {
+      "lib": "wit",
+      "rows": 100,
+      "inputs": 400,
+      "mountMs": 271.2,
+      "keystrokeMs": 27.2,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "rhf",
+      "rows": 100,
+      "inputs": 400,
+      "mountMs": 184.4,
+      "keystrokeMs": 26.3,
+      "rendersPerKeystroke": 1
+    },
+    {
+      "lib": "rhf-controller",
+      "rows": 100,
+      "inputs": 400,
+      "mountMs": 336.8,
+      "keystrokeMs": 27.5,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "tanstack",
+      "rows": 100,
+      "inputs": 400,
+      "mountMs": 492.6,
+      "keystrokeMs": 34.6,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "wit",
+      "rows": 500,
+      "inputs": 2000,
+      "mountMs": 818.8,
+      "keystrokeMs": 110.1,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "rhf",
+      "rows": 500,
+      "inputs": 2000,
+      "mountMs": 498.3,
+      "keystrokeMs": 103.3,
+      "rendersPerKeystroke": 1
+    },
+    {
+      "lib": "rhf-controller",
+      "rows": 500,
+      "inputs": 2000,
+      "mountMs": 2490.9,
+      "keystrokeMs": 109.7,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "tanstack",
+      "rows": 500,
+      "inputs": 2000,
+      "mountMs": 9424.7,
+      "keystrokeMs": 153.8,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "wit",
+      "rows": 1000,
+      "inputs": 4000,
+      "mountMs": 1471.1,
+      "keystrokeMs": 152.7,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "rhf",
+      "rows": 1000,
+      "inputs": 4000,
+      "mountMs": 880.7,
+      "keystrokeMs": 138.1,
+      "rendersPerKeystroke": 1
+    },
+    {
+      "lib": "rhf-controller",
+      "rows": 1000,
+      "inputs": 4000,
+      "mountMs": 7714.3,
+      "keystrokeMs": 144.6,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "tanstack",
+      "rows": 1000,
+      "inputs": 4000,
+      "mountMs": 39274.5,
+      "keystrokeMs": 263.3,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "wit",
+      "rows": 2500,
+      "inputs": 10000,
+      "mountMs": 3395,
+      "keystrokeMs": 266.9,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "rhf",
+      "rows": 2500,
+      "inputs": 10000,
+      "mountMs": 2072.2,
+      "keystrokeMs": 238.7,
+      "rendersPerKeystroke": 1
+    },
+    {
+      "lib": "rhf-controller",
+      "rows": 2500,
+      "inputs": 10000,
+      "mountMs": 40686.4,
+      "keystrokeMs": 256.3,
+      "rendersPerKeystroke": 2
+    },
+    {
+      "lib": "tanstack",
+      "rows": 2500,
+      "inputs": 10000,
+      "mountMs": 325639.3,
+      "keystrokeMs": 648.4,
+      "rendersPerKeystroke": 2
+    }
+  ]
+}

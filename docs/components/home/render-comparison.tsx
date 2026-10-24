@@ -12,7 +12,6 @@ import {
 } from 'react';
 import { FormProvider, useField, useForm } from 'wit-form';
 import { cn } from '@/lib/cn';
-import { Container, SectionHeading } from './primitives';
 
 type Side = 'shared' | 'atoms';
 
@@ -375,19 +374,27 @@ function Panel(props: {
   );
 }
 
-function Controls() {
+/** Window-style toolbar: what to do on the left, the controls on the right */
+function Toolbar() {
   const store = useDemo();
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm text-fd-muted-foreground">
-        Edit any field in either form. Keystrokes go to both, and the counters
-        are real React renders.
-      </p>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-fd-muted/40 px-4 py-2.5 sm:px-5">
+      <div className="flex items-center gap-3">
+        <div className="flex gap-1.5 max-sm:hidden" aria-hidden>
+          <span className="size-2.5 rounded-full bg-fd-foreground/15" />
+          <span className="size-2.5 rounded-full bg-fd-foreground/15" />
+          <span className="size-2.5 rounded-full bg-fd-foreground/15" />
+        </div>
+        <p className="text-sm text-fd-muted-foreground">
+          Type in either form. Keystrokes go to both, and the counters are real
+          React renders.
+        </p>
+      </div>
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => store.play()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-fd-background/60 px-3 text-xs font-medium transition outline-none hover:bg-fd-accent focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98]"
+          className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-fd-background px-3 text-xs font-medium transition outline-none hover:bg-fd-accent focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98]"
         >
           <Play className="size-3.5" /> Type for me
         </button>
@@ -421,7 +428,7 @@ function Verdict() {
       <span className="font-mono font-semibold tabular-nums text-rose-600 dark:text-rose-300">
         {tally.shared}
       </span>{' '}
-      field renders with shared state,{' '}
+      field renders with one state object,{' '}
       <span className="font-mono font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
         {tally.atoms}
       </span>{' '}
@@ -449,38 +456,37 @@ export function RenderComparison() {
   }, [store]);
 
   return (
-    <section className="pt-16 pb-20 sm:pt-20 sm:pb-28">
-      <Container className="flex flex-col gap-10">
-        <SectionHeading
-          eyebrow="Why atoms"
-          title="Your form shouldn't re-render because one input changed."
-          description="Most form libraries keep values in one shared object, so every keystroke re-renders every field. Wit Form gives each field its own atom: an update only reaches the field that changed."
-        />
-        <DemoContext.Provider value={store}>
-          <div className="flex flex-col gap-4">
-            <Controls />
-            <div className="grid gap-4 md:grid-cols-2">
-              <Panel
-                side="shared"
-                label="Shared form state"
-                title="Every field wakes up"
-                body="Each keystroke replaces the form object, so every field that reads it renders again, unless you memoize and tune selectors."
-              >
-                <SharedForm />
-              </Panel>
-              <Panel
-                side="atoms"
-                label="Wit Form"
-                title="Only the field you touched"
-                body="The input writes to its own atom. The rest of the form doesn't notice, with no memo, selectors or manual tuning."
-              >
-                <AtomForm />
-              </Panel>
-            </div>
+    <div className="relative">
+      <div
+        aria-hidden
+        className="absolute -inset-x-8 -inset-y-6 -z-10 rounded-[2.5rem] bg-gradient-to-b from-emerald-500/15 via-teal-500/5 to-transparent blur-2xl"
+      />
+      <DemoContext.Provider value={store}>
+        <div className="overflow-hidden rounded-2xl border bg-fd-background/80 shadow-2xl shadow-emerald-950/10 backdrop-blur">
+          <Toolbar />
+          <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
+            <Panel
+              side="shared"
+              label="One state object"
+              title="Every field wakes up"
+              body="Values live in one object, so each keystroke hands every field a new copy and they all render again, unless you add memo and selectors."
+            >
+              <SharedForm />
+            </Panel>
+            <Panel
+              side="atoms"
+              label="Wit Form"
+              title="Only the field you touched"
+              body="The input writes to its own atom. The rest of the form never hears about it, and there is nothing to memoize."
+            >
+              <AtomForm />
+            </Panel>
+          </div>
+          <div className="border-t px-4 py-3 sm:px-5">
             <Verdict />
           </div>
-        </DemoContext.Provider>
-      </Container>
-    </section>
+        </div>
+      </DemoContext.Provider>
+    </div>
   );
 }

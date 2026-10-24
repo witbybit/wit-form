@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 import {
   useId,
   useRef,
@@ -12,12 +14,14 @@ import { Window } from './primitives';
 
 export interface CodeTab {
   id: string;
-  label: string;
+  title: string;
+  body: string;
+  href: string;
   file: string;
   code: ReactNode;
-  aside: ReactNode;
 }
 
+/** A vertical list of features; the active one expands and drives the code window beside it */
 export function CodeTabs(props: { tabs: CodeTab[] }) {
   const [active, setActive] = useState(0);
   const baseId = useId();
@@ -27,11 +31,11 @@ export function CodeTabs(props: { tabs: CodeTab[] }) {
   const onKeyDown = (e: KeyboardEvent) => {
     const last = props.tabs.length - 1;
     const next =
-      e.key === 'ArrowRight'
+      e.key === 'ArrowDown'
         ? active === last
           ? 0
           : active + 1
-        : e.key === 'ArrowLeft'
+        : e.key === 'ArrowUp'
           ? active === 0
             ? last
             : active - 1
@@ -47,36 +51,62 @@ export function CodeTabs(props: { tabs: CodeTab[] }) {
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="grid items-start gap-8 lg:grid-cols-[1fr_1.6fr] lg:gap-12">
       <div
         role="tablist"
         aria-label="Code examples"
+        aria-orientation="vertical"
         onKeyDown={onKeyDown}
-        className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+        className="flex flex-col border-l"
       >
-        {props.tabs.map((tab, i) => (
-          <button
-            key={tab.id}
-            ref={(el) => {
-              tabRefs.current[i] = el;
-            }}
-            id={`${baseId}-tab-${tab.id}`}
-            role="tab"
-            type="button"
-            aria-selected={active === i}
-            aria-controls={`${baseId}-panel-${tab.id}`}
-            tabIndex={active === i ? 0 : -1}
-            onClick={() => setActive(i)}
-            className={cn(
-              'shrink-0 rounded-full border px-4 py-1.5 text-sm transition outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
-              active === i
-                ? 'border-emerald-500/40 bg-emerald-500/10 text-fd-foreground'
-                : 'border-transparent text-fd-muted-foreground hover:text-fd-foreground'
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {props.tabs.map((tab, i) => {
+          const selected = active === i;
+          return (
+            <div
+              key={tab.id}
+              className={cn(
+                '-ml-px border-l-2 py-4 pl-5 transition-colors',
+                selected ? 'border-emerald-500' : 'border-transparent'
+              )}
+            >
+              <button
+                ref={(el) => {
+                  tabRefs.current[i] = el;
+                }}
+                id={`${baseId}-tab-${tab.id}`}
+                role="tab"
+                type="button"
+                aria-selected={selected}
+                aria-controls={`${baseId}-panel-${tab.id}`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setActive(i)}
+                className={cn(
+                  'flex w-full items-baseline gap-3 rounded text-left text-lg font-semibold tracking-tight transition outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
+                  selected
+                    ? 'text-fd-foreground'
+                    : 'text-fd-muted-foreground hover:text-fd-foreground'
+                )}
+              >
+                <span className="font-mono text-xs font-normal text-fd-muted-foreground tabular-nums">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                {tab.title}
+              </button>
+              {selected && (
+                <div className="mt-2 flex flex-col gap-3 pl-8">
+                  <p className="text-fd-muted-foreground">{tab.body}</p>
+                  <Link
+                    href={tab.href}
+                    className="group inline-flex w-fit items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 dark:hover:text-emerald-200"
+                  >
+                    Read the guide
+                    <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {props.tabs.map((tab, i) => (
@@ -86,11 +116,12 @@ export function CodeTabs(props: { tabs: CodeTab[] }) {
           role="tabpanel"
           aria-labelledby={`${baseId}-tab-${tab.id}`}
           hidden={active !== i}
-          className="grid items-start gap-8 lg:grid-cols-[1fr_2fr]"
+          className="min-w-0"
         >
-          <div className="lg:pt-6">{tab.aside}</div>
-          <Window title={tab.file} className="min-w-0 shadow-xl">
-            {tab.code}
+          <Window title={tab.file} className="shadow-xl">
+            <div className="max-h-[420px] overflow-y-auto lg:h-[400px] lg:max-h-none">
+              {tab.code}
+            </div>
           </Window>
         </div>
       ))}

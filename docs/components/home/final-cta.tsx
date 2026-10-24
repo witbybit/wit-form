@@ -11,11 +11,11 @@ export function FinalCta() {
       />
       <Container className="flex flex-col items-center gap-8 text-center">
         <h2 className="max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          Build your first form in five minutes.
+          Your biggest form, without the lag.
         </h2>
         <p className="max-w-xl text-lg text-fd-muted-foreground">
           Install the package, wrap your form in a provider and call useField.
-          That's the whole setup.
+          That&apos;s the whole setup, and it stays fast at 2,000 fields.
         </p>
         <InstallCommand className="text-left" />
         <div className="flex flex-wrap justify-center gap-3">

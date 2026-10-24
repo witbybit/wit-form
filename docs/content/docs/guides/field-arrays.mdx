@@ -81,6 +81,8 @@ On submit, `values.items` is an array of row objects, in display order:
 ];
 ```
 
+A list with no rows is submitted as `[]`, not left out, so a schema like `z.array(...)` still sees an array.
+
 ### Things to know
 
 - **`fieldNames`** lists the fields in each row. Wit Form uses it to build the row objects in the submitted values, and to fill rows from initial values.

@@ -29,47 +29,84 @@ Each of these libraries makes different trade-offs. This page tries to show them
 | 🖥️ **Server actions / SSR helpers**  | ❌ No                                                                                         | ⚠️ `<Form>` component, no server-action helper               | ✅ Packages for Next.js, TanStack Start, Remix      | ❌ No                                                   |
 | 🌐 **Frameworks**                    | React                                                                                         | React (and React Native)                                     | ✅ React, Vue, Angular, Solid, Svelte, Lit, Preact  | React                                                   |
 | 🛠️ **Devtools**                      | ❌ No                                                                                         | ✅ `@hookform/devtools`                                      | ⚠️ TanStack Devtools plugin (pre-1.0)               | ❌ No                                                   |
-| 🔧 **Maintenance**                   | 🌱 New (0.1), successor to react-recoil-form                                                  | ✅ Very active, v8 in beta                                   | ✅ Active, v2 in alpha                              | ⚠️ No commits since November 2025                       |
+| 🔧 **Maintenance**                   | 🌱 New (0.2), successor to react-recoil-form                                                  | ✅ Very active, v8 in beta                                   | ✅ Active, v2 in alpha                              | ⚠️ No commits since November 2025                       |
 
 Sizes are for the full package, minified and gzipped, measured with React external. Jotai costs nothing extra if your app already uses it. Wit Form needs no extra package for schemas; React Hook Form needs `@hookform/resolvers` for them.
 
+## Benchmark
+
+Each library renders the same budget table: rows of four number inputs, with a live total under each column. Each one is built the way its docs recommend:
+
+- **Wit Form:** `useField` per cell, and `useFieldArrayColumnWatch` per total.
+- **React Hook Form (native inputs):** `register` per cell, and `useWatch` on one column's paths per total.
+- **React Hook Form (useController):** the same, with `useController` per cell, as you would for custom inputs.
+- **TanStack Form:** `form.Field` per cell, and a `useStore` selector per total.
+
+A script opens each table in Chrome, presses real keys in a cell halfway down, and checks that the column total is right afterwards. **Mount** is the time from rendering the form until the table is on screen. **Keystroke** is the time from a key press until the screen shows the change: the library's update, React's render, and the browser's layout and paint.
+
+{/* benchmark:start */}
+
+**Mount: first render until the table is on screen**
+
+| Inputs | Wit Form | React Hook Form (native inputs) | React Hook Form (useController) | TanStack Form |
+| ------ | -------- | ------------------------------- | ------------------------------- | ------------- |
+| 400    | 271 ms   | 184 ms                          | 337 ms                          | 493 ms        |
+| 2,000  | 819 ms   | 498 ms                          | 2.5 s                           | 9.4 s         |
+| 4,000  | 1.5 s    | 881 ms                          | 7.7 s                           | 39.3 s        |
+| 10,000 | 3.4 s    | 2.1 s                           | 40.7 s                          | 5.4 min       |
+
+**Keystroke: key press until the change is on screen**
+
+| Inputs | Wit Form | React Hook Form (native inputs) | React Hook Form (useController) | TanStack Form |
+| ------ | -------- | ------------------------------- | ------------------------------- | ------------- |
+| 400    | 27 ms    | 26 ms                           | 28 ms                           | 35 ms         |
+| 2,000  | 110 ms   | 103 ms                          | 110 ms                          | 154 ms        |
+| 4,000  | 153 ms   | 138 ms                          | 145 ms                          | 263 ms        |
+| 10,000 | 267 ms   | 239 ms                          | 256 ms                          | 648 ms        |
+
+Median of 5 runs, 21 keystrokes each. Chrome 155.0.8059.39, 4× CPU slowdown, AMD Ryzen 5 220 w/ Radeon 740M Graphics. Measured 2026-10-24.
+
+{/* benchmark:end */}
+
+What the numbers say:
+
+- **React Hook Form with native inputs is the fastest.** The browser keeps the values, so React does very little. Wit Form takes about 1.6× as long to mount and 3 to 12% longer per keystroke.
+- **Among controlled inputs, Wit Form mounts fastest**: about 3× faster than `useController` at 2,000 inputs and 12× at 10,000, and over 10× faster than TanStack Form.
+- **Typing costs about the same** in Wit Form and with `useController`, within about 6%. TanStack Form takes 1.3 to 2.4× as long, more as the form grows. At this size, much of each keystroke goes to the browser laying out the large table, which costs the same in every library.
+
+The 4× CPU slowdown stands in for a mid-range laptop or phone. On a fast machine every number is smaller, but the ratios hold. The code is in [`bench/`](https://github.com/witbybit/wit-form/tree/main/bench). Run it with `pnpm --filter wit-form-bench bench`.
+
 ## React Hook Form
 
-React Hook Form is the default choice for most React apps, and for good reasons. It's mature, has no dependencies, has typed field names, supports async validation and works with almost every schema library through resolvers. With native inputs and `register`, typing doesn't re-render React at all, which is cheaper than any of the other libraries here, Wit Form included.
+The most widely used React form library: mature, no dependencies, typed field names, and schema support through resolvers. With native inputs and `register`, typing doesn't re-render React at all.
 
-**Choose React Hook Form if** you want the most widely used option, you mostly use native, uncontrolled inputs, you build for React Native, or you rely on its ecosystem, like devtools or resolvers for libraries that don't implement Standard Schema.
+**Choose it if** you mostly use native inputs, build for React Native, or rely on its ecosystem.
 
 **Where Wit Form differs:**
 
-- Every field is controlled, so custom inputs, date pickers and selects don't need a separate `Controller` path. The same `useField` works for all of them.
-- Schemas need no extra package. Pass any Standard Schema to a field, a field array or the whole form, and form-level issues land on the matching fields, including fields inside field array rows.
-- Async validators get a built-in `debounceValidation`, and results of outdated checks are dropped.
-- Fields are dropped from the values when they unmount. In React Hook Form they're kept by default, so a hidden conditional field can still be submitted unless you set `shouldUnregister`.
-- `extraInfo` stores data such as an option's label or a `File` preview next to a value. In React Hook Form you keep that state yourself.
-- `useFieldArrayColumnWatch` subscribes to only some columns of a field array, which helps with running totals over large tables.
+- Every field is controlled, so custom inputs and UI kits use the same `useField`, with no separate `Controller` path. It mounts large forms several times faster than `useController` (see the [benchmark](#benchmark)).
+- Schemas need no extra package, and a form schema's issues land on the matching fields, inside table rows too.
+- Hidden fields drop out of the submitted values when they unmount. React Hook Form keeps them unless you set `shouldUnregister`.
 
 ## TanStack Form
 
-TanStack Form has the strongest TypeScript story of the four: field names and values are inferred deeply from `defaultValues`, with no type to write. Async validators come with built-in debouncing, Standard Schema works without an adapter, and it has official packages for Next.js server actions and for other frameworks. Re-renders are scoped to each `form.Field`, so typing stays as cheap as it is in Wit Form.
+A typed form library with the deepest type inference of the four: names and values come from `defaultValues`, with no type to write. It runs in several frameworks and has helpers for server actions.
 
-**Choose TanStack Form if** you need server-side validation helpers or server actions, devtools, the same form logic in a framework other than React, or types inferred from `defaultValues` without declaring a type.
+**Choose it if** you need server actions, devtools, or the same form logic outside React.
 
 **Where Wit Form differs:**
 
-- Less API to learn: plain hooks and plain validator functions, with no `validators` map. Type safety is opt-in: describe your values once with `createFormHooks<Values>()` and every hook checks names and values.
-- Field array rows get stable `rowId`s, so React keys and row state survive inserts, moves and removals without you adding ids to your data. `swap` and `move` only reorder rows, so row components don't even re-render.
-- A form schema's issues are mapped onto fields automatically, so one schema can drive the errors of the whole form.
-- Fields are dropped from the values when they unmount. TanStack Form keeps the value and only resets the field's errors.
-- The first invalid field is focused on submit, without extra code.
-- A smaller bundle, especially if you already use Jotai.
+- Less API to learn: plain hooks and plain validator functions, and type safety is opt-in with `createFormHooks<Values>()`.
+- Table rows keep stable ids through inserts, moves and removals, and one schema drives the errors of the whole form.
+- Large forms mount over 10× faster, and typing takes less time (see the [benchmark](#benchmark)).
 
 ## Formik
 
-Formik was the most popular form library for years and is still widely installed. Today it's largely unmaintained: the last releases (November 2025) were small React 19 fixes, and the previous one was in April 2024. All state lives in one reducer, so every keystroke re-renders the whole form and every component that reads it. `FastField` helps, but only for simple cases.
+Formik was the most popular form library for years, but it's largely unmaintained now, and every keystroke re-renders the whole form.
 
-**Choose Formik if** you're maintaining an app that already uses it and the forms are small. For new projects, any of the other three is a better fit.
+**Choose it if** you maintain an app that already uses it and the forms are small.
 
-**Moving from Formik to Wit Form** mostly means replacing `<Formik>` with a `FormProvider`, `useFormik` with `useForm`, and `<Field>` with `useField` or Wit Form's `<Field>`. Formik's `validationSchema` becomes `useForm`'s `schema`: Yup 1.7 and newer implements Standard Schema, so the same Yup schema works as is. `setFieldError` becomes `setError`, and `isValid`, `dirty`, `submitCount` and `isSubmitting` are on `formState` (see [Validation](/docs/guides/validation)).
+**Moving to Wit Form** mostly means swapping `<Formik>` for a `FormProvider`, `useFormik` for `useForm` and `<Field>` for `useField`. A Yup 1.7+ `validationSchema` works as is as `useForm`'s `schema`.
 
 ## When Wit Form is a good fit
 
@@ -79,14 +116,3 @@ Formik was the most popular form library for years and is still widely installed
 - **Forms with lots of conditional fields**, where hidden fields shouldn't end up in the submitted values.
 - **Apps that already use Jotai**, where the extra cost is about 10 kB.
 - **Apps moving off react-recoil-form**: it's a drop-in replacement. See [Migrating](/docs/guides/migrating).
-
-## When to pick something else
-
-Be honest with yourself about these. Wit Form doesn't have them today:
-
-- **Server actions, SSR helpers, devtools, or frameworks other than React.**
-- **Types inferred from your initial values.** Wit Form's typed hooks need you to write the values type once. Fields inside field array rows are only checked when TypeScript sees the row names as literal types (inline, or `as const`).
-- **Zero re-renders for native inputs.** Every Wit Form field is controlled, so typing re-renders that field's component. React Hook Form's uncontrolled `register` avoids even that.
-- **A large community.** Wit Form is new. React Hook Form has far more answers, examples and integrations online.
-
-If any of these is a must-have, React Hook Form or TanStack Form will serve you better.
