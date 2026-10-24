@@ -4,7 +4,7 @@ import { libVersion } from '@/lib/shared';
 import { CopyPromptButton } from './copy-prompt-button';
 import { InstallCommand } from './install-command';
 import { ButtonLink, Container } from './primitives';
-import { RenderComparison } from './render-comparison';
+import { PayrollDemo } from './payroll-demo';
 
 export function Hero() {
   return (
@@ -50,7 +50,7 @@ export function Hero() {
           <InstallCommand compact />
         </div>
 
-        <RenderComparison />
+        <PayrollDemo />
       </Container>
     </section>
   );
