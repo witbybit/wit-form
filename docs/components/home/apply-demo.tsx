@@ -404,6 +404,7 @@ function ResumeField() {
           id={id}
           ref={ref}
           type="file"
+          data-field="resume"
           accept=".pdf,.doc,.docx"
           className="sr-only"
           onChange={(e) => {
@@ -442,6 +443,7 @@ function CoverLetterField() {
         </span>
       </div>
       <textarea
+        data-field="coverLetter"
         id={id}
         rows={2}
         value={fieldValue}
@@ -468,6 +470,7 @@ function TermsField() {
           id={id}
           ref={ref}
           type="checkbox"
+          data-field="terms"
           checked={!!fieldValue}
           aria-invalid={!!error}
           onChange={(e) => setFieldValue(e.target.checked)}
@@ -775,7 +778,10 @@ function ApplicationWizard() {
 }
 
 /** Sets an input's value the way typing does, so React and the form see a real change */
-function typeInto(element: HTMLInputElement, value: string) {
+function typeInto(
+  element: HTMLInputElement | HTMLTextAreaElement,
+  value: string
+) {
   const prototype = Object.getPrototypeOf(element);
   Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(
     element,
@@ -787,8 +793,8 @@ function typeInto(element: HTMLInputElement, value: string) {
 export function ApplyDemo() {
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // A short scripted visit: fill in the profile, move on, pick a role and skills,
-  // add a position and try to continue with it empty
+  // A scripted visit that runs into validation twice, fixes it and submits:
+  // profile, experience with an empty position, then finish with missing fields
   useEffect(() => {
     const root = rootRef.current;
     if (
@@ -807,10 +813,21 @@ export function ApplyDemo() {
     const find = <T extends Element>(selector: string) =>
       root.querySelector<T>(selector);
     const click = (selector: string) => find<HTMLElement>(selector)?.click();
+    // Attaches a file the way a drop would, through the input's own file list
+    const attach = (selector: string, name: string) => {
+      const input = find<HTMLInputElement>(selector);
+      if (!input) return;
+      const transfer = new DataTransfer();
+      transfer.items.add(
+        new File([new Uint8Array(48_000)], name, { type: 'application/pdf' })
+      );
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
     const type = (selector: string, text: string) =>
       [...text].forEach((_, i) =>
         then(45, () => {
-          const input = find<HTMLInputElement>(selector);
+          const input = find<HTMLInputElement | HTMLTextAreaElement>(selector);
           if (input) typeInto(input, text.slice(0, i + 1));
         })
       );
@@ -825,6 +842,23 @@ export function ApplyDemo() {
     then(400, () => click('[data-value="TypeScript"]'));
     then(700, () => click('[data-action="add-position"]'));
     then(1000, () => click('[data-action="next"]'));
+
+    // Fix the empty position and carry on
+    then(1300, () => {});
+    type('[data-position="1"] [data-field="company"]', 'Hooli');
+    type('[data-position="1"] [data-field="title"]', 'Staff engineer');
+    then(700, () => click('[data-action="next"]'));
+
+    // Try to submit too early, then fill in what's missing and submit
+    then(1000, () => click('button[type="submit"]'));
+    then(1300, () => attach('[data-field="resume"]', 'grace-hopper.pdf'));
+    then(700, () => {
+      const date = find<HTMLInputElement>('[data-field="startDate"]');
+      if (date) typeInto(date, '2026-12-01');
+    });
+    type('[data-field="coverLetter"]', 'I build compilers and teach.');
+    then(500, () => click('[data-field="terms"]'));
+    then(900, () => click('button[type="submit"]'));
 
     const stop = () => {
       stopped = true;
