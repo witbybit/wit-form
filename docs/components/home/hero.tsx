@@ -8,19 +8,19 @@ import { RenderComparison } from './render-comparison';
 
 export function Hero() {
   return (
-    <section className="relative isolate overflow-hidden">
+    <section className="relative isolate overflow-x-clip">
       <BackgroundGrid />
       <Container className="flex flex-col gap-14 pt-16 pb-20 md:pt-24 sm:pb-24">
         {/* One centred column, so the eye runs headline, pitch, actions, then the demo */}
         <div className="flex flex-col items-center gap-7 text-center">
           <Link
-            href="/docs/guides/migrating"
+            href="/docs/guides/validation#schema-validation"
             className="group inline-flex items-center gap-2 rounded-full border bg-fd-card/60 py-1 pr-3 pl-1 text-xs text-fd-muted-foreground backdrop-blur transition hover:border-emerald-500/40 hover:text-fd-foreground"
           >
             <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-300">
               v{libVersion}
             </span>
-            The successor to react-recoil-form
+            New: schema and async validation
             <ArrowRight className="size-3 transition group-hover:translate-x-0.5" />
           </Link>
 
@@ -28,14 +28,15 @@ export function Hero() {
             Big forms.
             <br />
             <span className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 bg-clip-text text-transparent dark:from-emerald-300 dark:via-green-300 dark:to-lime-200">
-              Instant keystrokes.
+              Fast to load, fast to type.
             </span>
           </h1>
 
           <p className="max-w-2xl text-lg text-pretty text-fd-muted-foreground sm:text-xl">
-            Wit Form gives every field its own state. Typing re-renders the
-            field you&apos;re in, not the form and not the 1,999 fields next to
-            it. No memo, no selectors, nothing to tune.
+            Wit Form gives every field its own state. Big forms mount several
+            times faster than other controlled-input libraries, and typing
+            re-renders only the field you&apos;re in. No memo, no selectors,
+            nothing to tune.
           </p>
 
           <div className="flex flex-wrap justify-center gap-3">

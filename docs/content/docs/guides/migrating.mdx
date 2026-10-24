@@ -1,9 +1,11 @@
 ---
-title: 'Migrating from react-recoil-form'
-description: 'Wit Form is the successor to react-recoil-form. It has the same API, with Jotai in place of Recoil, and it works on React 18 and newer.'
+title: 'Migrating'
+description: 'Move to Wit Form from react-recoil-form, which has the same API, or from Formik.'
 ---
 
-## Steps
+## From react-recoil-form
+
+Wit Form is the successor to react-recoil-form. It has the same API, with Jotai in place of Recoil, and it works on React 18 and newer.
 
 1. Swap the dependencies:
 
@@ -23,6 +25,19 @@ description: 'Wit Form is the successor to react-recoil-form. It has the same AP
 
 That's all most apps need. Hooks, options and return values have the same names and behaviour.
 
-## The `skipRecoilRoot` option
+`FormProvider`'s `skipRecoilRoot` option still works, as an alias of the new name `skipJotaiProvider`. Both keep the form's state in the surrounding Jotai store instead of a new one. See [FormProvider](/docs/api/form-provider).
 
-`FormProvider`'s `skipRecoilRoot` option still works, as an alias of the new name `skipJotaiProvider`. Switch to `skipJotaiProvider` when convenient. Both keep the form's state in the surrounding Jotai store instead of a new one. See [FormProvider](/docs/api/form-provider).
+## From Formik
+
+Most Formik concepts have a direct counterpart:
+
+| Formik                                            | Wit Form                                                          |
+| ------------------------------------------------- | ----------------------------------------------------------------- |
+| `<Formik>` or `useFormik`                         | A [`FormProvider`](/docs/api/form-provider) with `useForm` inside |
+| `<Field>`, `useField`                             | [`useField`](/docs/api/use-field) or Wit Form's `<Field>`         |
+| `<FieldArray>`                                    | [`useFieldArray`](/docs/api/use-field-array)                      |
+| `validationSchema`                                | `useForm`'s `schema`. A Yup 1.7+ schema works as is.              |
+| `setFieldError`                                   | `setError`                                                        |
+| `isValid`, `dirty`, `submitCount`, `isSubmitting` | `formState.isValid`, `isDirty`, `submitCount`, `isSubmitting`     |
+
+`initialValues` and `onSubmit` keep their names. Field names are paths, like `address.city`, but fields inside a list use plain names with `ancestors`. See [Field arrays](/docs/guides/field-arrays).

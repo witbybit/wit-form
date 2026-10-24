@@ -75,9 +75,9 @@ const name = (lib: string) => {
     : library.name;
 };
 
-// Whole numbers from 10× up, where a decimal is false precision
+// Whole numbers from 10× up, where a decimal is false precision. Rounded down, never overclaimed
 const times = (a: number, b: number) =>
-  `${a / b >= 10 ? Math.round(a / b) : (a / b).toFixed(1)}×`;
+  `${a / b >= 10 ? Math.floor(a / b) : (a / b).toFixed(1)}×`;
 
 /** What the chart shows, in a sentence or two worked out from the numbers, so it never overclaims */
 function summarize(metric: Metric, rows: { lib: string; value: number }[]) {
@@ -227,13 +227,24 @@ export function Benchmark() {
           {environment.browser.replace(/\..*$/, '')} · {environment.cpuSlowdown}
           × CPU slowdown · median of {environment.runs} runs · {data.date}
         </span>
-        <Link
-          href="/docs/comparison#benchmark"
-          className="group inline-flex items-center gap-1 font-medium text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 dark:hover:text-emerald-200"
-        >
-          Full comparison and method
-          <ArrowRight className="size-3 transition group-hover:translate-x-0.5" />
-        </Link>
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          {[
+            [
+              'Try the 500-row table',
+              '/docs/examples/advanced/render-performance',
+            ],
+            ['Full comparison and method', '/docs/comparison#benchmark'],
+          ].map(([label, href]) => (
+            <Link
+              key={href}
+              href={href}
+              className="group inline-flex items-center gap-1 font-medium text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 dark:hover:text-emerald-200"
+            >
+              {label}
+              <ArrowRight className="size-3 transition group-hover:translate-x-0.5" />
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

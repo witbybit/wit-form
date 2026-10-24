@@ -1,35 +1,35 @@
 ---
 title: 'Comparison'
-description: 'How Wit Form compares with React Hook Form, TanStack Form and Formik: where it fits, and where another library is the better choice.'
+description: 'How Wit Form compares with React Hook Form and TanStack Form: where it fits, and where another library is the better choice.'
 ---
 
-Each of these libraries makes different trade-offs. This page tries to show them fairly, including the places where Wit Form is behind. The facts were checked against each library's latest release in October 2026: React Hook Form 7.89, TanStack Form 1.33 and Formik 2.4.9. For Wit Form, they describe the current `main` branch.
+Each of these libraries makes different trade-offs. This page tries to show them fairly, including the places where Wit Form is behind. The facts were checked against each library's latest release in October 2026: React Hook Form 7.89 and TanStack Form 1.33. For Wit Form, they describe the current `main` branch.
 
 ## At a glance
 
 ✅ yes or a strength · ⚠️ partly, or with a catch · ❌ no
 
-|                                      | Wit Form                                                                                      | React Hook Form                                              | TanStack Form                                       | Formik                                                  |
-| ------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------------- |
-| 🧠 **State model**                   | One Jotai atom per field                                                                      | Uncontrolled inputs (refs) + proxy state                     | Controlled, one store with selectors                | Controlled, one reducer for the form                    |
-| ⚡ **Typing re-renders**             | ✅ That field and its watchers                                                                | ✅ Nothing for native inputs, or the one `Controller`        | ✅ That `form.Field` and its subscribers            | ❌ The whole form (unless `FastField`)                  |
-| 📦 **Size (min + gzip)**             | ✅ ~10 kB, plus ~4 kB for Jotai                                                               | ~15 kB                                                       | ~19 kB                                              | ~15 kB                                                  |
-| 🔗 **Runtime dependencies**          | Jotai (peer)                                                                                  | ✅ None                                                      | TanStack Store packages                             | ⚠️ 8, including lodash                                  |
-| ⏳ **Async validation**              | ✅ Yes, with built-in debounce                                                                | ✅ Yes                                                       | ✅ Yes, with built-in debounce                      | ✅ Yes                                                  |
-| 📐 **Schema validation**             | ✅ Standard Schema built in (Zod, Valibot, ArkType, Yup 1.7+)                                 | ✅ Zod, Yup, Valibot and others via `@hookform/resolvers`    | ✅ Standard Schema built in (Zod, Valibot, ArkType) | ⚠️ Yup built in                                         |
-| 🧪 **Validation levels**             | Field, field array, form, each with a schema                                                  | Field, field array (`rules`), form, schema                   | Field (including array fields), form, schema        | Field, form, schema                                     |
-| 🔒 **Type-safe field names**         | ✅ Yes, with `createFormHooks`                                                                | ✅ Yes                                                       | ✅ Yes                                              | ❌ No                                                   |
-| 📋 **Field arrays**                  | ✅ Nested, stable `rowId`s                                                                    | ✅ Nested, stable `id`s                                      | ⚠️ Nested, keyed by index                           | ⚠️ Nested, keyed by index                               |
-| 🔀 **Array operations**              | ✅ append, prepend, insert, update, swap, move, remove, clear, replace                        | append, prepend, insert, update, swap, move, remove, replace | append, insert, remove, swap, move, replace         | push, insert, remove, swap, move, unshift, pop, replace |
-| 📊 **Form state flags**              | ✅ `isValid`, `isDirty`, `isSubmitted`, `submitCount`…, re-render only for the flags you read | ✅ Same set, re-render only for the flags you read           | ✅ Same set, via selectors                          | ⚠️ Same set, but every change re-renders the form       |
-| 🎯 **Focus the first invalid field** | ✅ Yes, `shouldFocusError`                                                                    | ✅ Yes, `shouldFocusError`                                   | ⚠️ Do it yourself in `onSubmitInvalid`              | ❌ No                                                   |
-| 🙈 **Value of an unmounted field**   | Discarded (opt out with `skipUnregister`)                                                     | Kept (opt in to drop with `shouldUnregister`)                | Kept                                                | Kept                                                    |
-| 🏷️ **Extra data next to a value**    | ✅ Yes, `extraInfo`                                                                           | ❌ No                                                        | ❌ No                                               | ❌ No                                                   |
-| 👀 **Watch one column of an array**  | ✅ Yes, `useFieldArrayColumnWatch`                                                            | ⚠️ Watch the whole array, or each cell by name               | ✅ Subscribe with a selector                        | ❌ No, every change re-renders                          |
-| 🖥️ **Server actions / SSR helpers**  | ❌ No                                                                                         | ⚠️ `<Form>` component, no server-action helper               | ✅ Packages for Next.js, TanStack Start, Remix      | ❌ No                                                   |
-| 🌐 **Frameworks**                    | React                                                                                         | React (and React Native)                                     | ✅ React, Vue, Angular, Solid, Svelte, Lit, Preact  | React                                                   |
-| 🛠️ **Devtools**                      | ❌ No                                                                                         | ✅ `@hookform/devtools`                                      | ⚠️ TanStack Devtools plugin (pre-1.0)               | ❌ No                                                   |
-| 🔧 **Maintenance**                   | 🌱 New (0.2), successor to react-recoil-form                                                  | ✅ Very active, v8 in beta                                   | ✅ Active, v2 in alpha                              | ⚠️ No commits since November 2025                       |
+|                                      | Wit Form                                                                                      | React Hook Form                                              | TanStack Form                                       |
+| ------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------- |
+| 🧠 **State model**                   | One Jotai atom per field                                                                      | Uncontrolled inputs (refs) + proxy state                     | Controlled, one store with selectors                |
+| ⚡ **Typing re-renders**             | ✅ That field and its watchers                                                                | ✅ Nothing for native inputs, or the one `Controller`        | ✅ That `form.Field` and its subscribers            |
+| 📦 **Size (min + gzip)**             | ✅ ~10 kB, plus ~4 kB for Jotai                                                               | ~15 kB                                                       | ~19 kB                                              |
+| 🔗 **Runtime dependencies**          | Jotai (peer)                                                                                  | ✅ None                                                      | TanStack Store packages                             |
+| ⏳ **Async validation**              | ✅ Yes, with built-in debounce                                                                | ✅ Yes                                                       | ✅ Yes, with built-in debounce                      |
+| 📐 **Schema validation**             | ✅ Standard Schema built in (Zod, Valibot, ArkType, Yup 1.7+)                                 | ✅ Zod, Yup, Valibot and others via `@hookform/resolvers`    | ✅ Standard Schema built in (Zod, Valibot, ArkType) |
+| 🧪 **Validation levels**             | Field, field array, form, each with a schema                                                  | Field, field array (`rules`), form, schema                   | Field (including array fields), form, schema        |
+| 🔒 **Type-safe field names**         | ✅ Yes, with `createFormHooks`                                                                | ✅ Yes                                                       | ✅ Yes                                              |
+| 📋 **Field arrays**                  | ✅ Nested, stable `rowId`s                                                                    | ✅ Nested, stable `id`s                                      | ⚠️ Nested, keyed by index                           |
+| 🔀 **Array operations**              | ✅ append, prepend, insert, update, swap, move, remove, clear, replace                        | append, prepend, insert, update, swap, move, remove, replace | append, insert, remove, swap, move, replace         |
+| 📊 **Form state flags**              | ✅ `isValid`, `isDirty`, `isSubmitted`, `submitCount`…, re-render only for the flags you read | ✅ Same set, re-render only for the flags you read           | ✅ Same set, via selectors                          |
+| 🎯 **Focus the first invalid field** | ✅ Yes, `shouldFocusError`                                                                    | ✅ Yes, `shouldFocusError`                                   | ⚠️ Do it yourself in `onSubmitInvalid`              |
+| 🙈 **Value of an unmounted field**   | Discarded (opt out with `skipUnregister`)                                                     | Kept (opt in to drop with `shouldUnregister`)                | Kept                                                |
+| 🏷️ **Extra data next to a value**    | ✅ Yes, `extraInfo`                                                                           | ❌ No                                                        | ❌ No                                               |
+| 👀 **Watch one column of an array**  | ✅ Yes, `useFieldArrayColumnWatch`                                                            | ⚠️ Watch the whole array, or each cell by name               | ✅ Subscribe with a selector                        |
+| 🖥️ **Server actions / SSR helpers**  | ❌ No                                                                                         | ⚠️ `<Form>` component, no server-action helper               | ✅ Packages for Next.js, TanStack Start, Remix      |
+| 🌐 **Frameworks**                    | React                                                                                         | React (and React Native)                                     | ✅ React, Vue, Angular, Solid, Svelte, Lit, Preact  |
+| 🛠️ **Devtools**                      | ❌ No                                                                                         | ✅ `@hookform/devtools`                                      | ⚠️ TanStack Devtools plugin (pre-1.0)               |
+| 🔧 **Maintenance**                   | 🌱 New (0.2), successor to react-recoil-form                                                  | ✅ Very active, v8 in beta                                   | ✅ Active, v2 in alpha                              |
 
 Sizes are for the full package, minified and gzipped, measured with React external. Jotai costs nothing extra if your app already uses it. Wit Form needs no extra package for schemas; React Hook Form needs `@hookform/resolvers` for them.
 
@@ -90,7 +90,7 @@ The most widely used React form library: mature, no dependencies, typed field na
 
 ## TanStack Form
 
-A typed form library with the deepest type inference of the four: names and values come from `defaultValues`, with no type to write. It runs in several frameworks and has helpers for server actions.
+A typed form library with the deepest type inference of the three: names and values come from `defaultValues`, with no type to write. It runs in several frameworks and has helpers for server actions.
 
 **Choose it if** you need server actions, devtools, or the same form logic outside React.
 
@@ -99,14 +99,6 @@ A typed form library with the deepest type inference of the four: names and valu
 - Less API to learn: plain hooks and plain validator functions, and type safety is opt-in with `createFormHooks<Values>()`.
 - Table rows keep stable ids through inserts, moves and removals, and one schema drives the errors of the whole form.
 - Large forms mount over 10× faster, and typing takes less time (see the [benchmark](#benchmark)).
-
-## Formik
-
-Formik was the most popular form library for years, but it's largely unmaintained now, and every keystroke re-renders the whole form.
-
-**Choose it if** you maintain an app that already uses it and the forms are small.
-
-**Moving to Wit Form** mostly means swapping `<Formik>` for a `FormProvider`, `useFormik` for `useForm` and `<Field>` for `useField`. A Yup 1.7+ `validationSchema` works as is as `useForm`'s `schema`.
 
 ## When Wit Form is a good fit
 

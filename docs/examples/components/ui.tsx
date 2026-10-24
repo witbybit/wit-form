@@ -4,7 +4,12 @@
  * Presentational helpers shared by the examples. Nothing in this file is specific to wit-form
  * except FormInspector, which shows the live form state next to each example.
  */
-import { useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from 'react';
 import { useFormState, useFormValuesAndExtraInfos, useIsDirty } from 'wit-form';
 
 export const sleep = (ms: number) =>
@@ -90,15 +95,20 @@ export function Alert(props: {
 
 /** Counts how many times its parent has rendered. Used to show what re-renders as you type. */
 export function RenderCount() {
+  const ref = useRef<HTMLSpanElement>(null);
   const renders = useRef(0);
-  renders.current += 1;
+  // Counted after each commit and written straight to the DOM, so the server and client markup
+  // match (counting during render would differ when React renders twice in development)
+  useLayoutEffect(() => {
+    renders.current += 1;
+    if (ref.current) ref.current.textContent = String(renders.current);
+  });
   return (
     <span
+      ref={ref}
       title="Number of renders"
       className="inline-block min-w-[1.75rem] rounded bg-amber-100 px-1 text-center font-mono text-[10px] leading-4 text-amber-800 tabular-nums"
-    >
-      {renders.current}
-    </span>
+    />
   );
 }
 

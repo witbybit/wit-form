@@ -6,12 +6,14 @@ function Card(props: {
   title: string;
   body: ReactNode;
   visual?: ReactNode;
+  /** Overrides the visual area's fixed height, e.g. for the full-width card */
+  visualClassName?: string;
   className?: string;
 }) {
   return (
     <article
       className={cn(
-        'group relative flex flex-col justify-between gap-8 overflow-hidden rounded-2xl border bg-fd-card/50 p-6 transition duration-300 hover:border-emerald-500/30 hover:bg-fd-card sm:p-7',
+        'group relative flex flex-col gap-6 overflow-hidden rounded-2xl border bg-fd-card/50 p-6 transition duration-300 hover:border-emerald-500/30 hover:bg-fd-card sm:p-7',
         props.className
       )}
     >
@@ -19,7 +21,18 @@ function Card(props: {
         aria-hidden
         className="absolute -top-20 -right-20 size-48 rounded-full bg-emerald-500/0 blur-3xl transition duration-500 group-hover:bg-emerald-500/10"
       />
-      {props.visual && <div aria-hidden>{props.visual}</div>}
+      {/* One height for every visual, so the titles in a row line up */}
+      {props.visual && (
+        <div
+          aria-hidden
+          className={cn(
+            'flex min-h-44 flex-col justify-center',
+            props.visualClassName
+          )}
+        >
+          {props.visual}
+        </div>
+      )}
       <div>
         <h3 className="mb-2 text-lg font-semibold tracking-tight">
           {props.title}
@@ -83,24 +96,79 @@ function ColumnWatchVisual() {
   );
 }
 
-/** Rows keep their ids while their order changes */
+/** Two rows trade places on a loop, and each keeps its id */
 function StableRowsVisual() {
+  const rows = [
+    {
+      id: 'r_7f2',
+      name: 'Laptop',
+      motion: 'motion-safe:animate-[row-swap-down_5s_ease-in-out_infinite]',
+    },
+    {
+      id: 'r_a91',
+      name: 'Monitor',
+      motion: 'motion-safe:animate-[row-swap-up_5s_ease-in-out_infinite]',
+    },
+    { id: 'r_c04', name: 'Keyboard', motion: '' },
+  ];
   return (
     <div className="flex flex-col gap-1.5 font-mono text-xs">
-      {[
-        ['r_7f2', 'Laptop', 'swap ↓'],
-        ['r_a91', 'Monitor', 'swap ↑'],
-        ['r_c04', 'Keyboard', ''],
-      ].map(([id, name, action]) => (
+      {rows.map((row) => (
         <div
-          key={id}
-          className="flex items-center gap-3 rounded-lg border bg-fd-background px-3 py-2"
+          key={row.id}
+          className={cn(
+            'flex h-9 items-center gap-3 rounded-lg border bg-fd-background px-3',
+            row.motion && 'relative z-10 border-emerald-500/30',
+            row.motion
+          )}
         >
-          <span className="text-emerald-700 dark:text-emerald-300">{id}</span>
-          <span className="flex-1">{name}</span>
-          <span className="text-fd-muted-foreground">{action}</span>
+          <span className="text-emerald-700 dark:text-emerald-300">
+            {row.id}
+          </span>
+          <span className="flex-1">{row.name}</span>
         </div>
       ))}
+      <p className="mt-1 font-sans text-[11px] text-fd-muted-foreground">
+        swap(0, 1): same ids, no re-render
+      </p>
+    </div>
+  );
+}
+
+/** A picker that shows a name but stores an id, with the name kept as extra info */
+function ExtraInfoVisual() {
+  return (
+    <div className="flex flex-col gap-2 text-xs">
+      <div className="flex items-center justify-between rounded-lg border bg-fd-background px-3 py-2 text-sm">
+        <span className="flex items-center gap-2">
+          <span className="size-5 rounded-full bg-rose-500" />
+          Priya Patel
+        </span>
+        <span className="text-fd-muted-foreground">▾</span>
+      </div>
+      <dl className="grid grid-cols-[5rem_1fr] gap-y-1 rounded-lg border bg-fd-background/50 px-3 py-2 font-mono">
+        <dt className="text-fd-muted-foreground">value</dt>
+        <dd>&apos;m_101&apos;</dd>
+        <dt className="text-fd-muted-foreground">extraInfo</dt>
+        <dd className="truncate">{"{ label: 'Priya Patel' }"}</dd>
+      </dl>
+    </div>
+  );
+}
+
+/** An editor line with a misspelt field name and the error TypeScript shows for it */
+function TypeErrorVisual() {
+  return (
+    <div className="rounded-xl border bg-fd-background p-3 font-mono text-xs">
+      {"useField({ name: '"}
+      <span className="underline decoration-red-500 decoration-wavy underline-offset-4">
+        adress.city
+      </span>
+      {"' })"}
+      <div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[11px] leading-relaxed text-red-700 dark:text-red-300">
+        Type &apos;&quot;adress.city&quot;&apos; is not assignable to type
+        FieldPath&lt;Order&gt;.
+      </div>
     </div>
   );
 }
@@ -167,11 +235,7 @@ export function Features() {
             body="Pass any Standard Schema to a field, a list or the whole form. Errors land on the matching fields, inside table rows too. No adapter to install."
           />
           <Card
-            visual={
-              <pre className="overflow-x-auto rounded-xl border bg-fd-background p-3 font-mono text-xs leading-5">
-                {'setFieldValue(option.id, {\n  label: option.name,\n})'}
-              </pre>
-            }
+            visual={<ExtraInfoVisual />}
             title="Extra info per field"
             body={
               <>
@@ -181,18 +245,7 @@ export function Features() {
             }
           />
           <Card
-            visual={
-              <pre className="overflow-x-auto rounded-xl border bg-fd-background p-3 font-mono text-xs leading-5">
-                <span className="text-fd-muted-foreground">
-                  {'// checked against Order\n'}
-                </span>
-                {"useField({ name: '"}
-                <span className="underline decoration-red-500 decoration-wavy underline-offset-4">
-                  adress.city
-                </span>
-                {"' })"}
-              </pre>
-            }
+            visual={<TypeErrorVisual />}
             title="Type-safe when you want it"
             body={
               <>
@@ -203,6 +256,7 @@ export function Features() {
           />
           <Card
             className="lg:col-span-3"
+            visualClassName="min-h-0"
             visual={
               <ul className="flex flex-wrap gap-2">
                 {details.map((detail) => (

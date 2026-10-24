@@ -5,30 +5,18 @@ import { Container, SectionHeading } from './primitives';
 const samples = [
   {
     id: 'fields',
-    file: 'text-field.tsx',
-    title: 'Bring your own inputs',
-    body: 'useField returns the value, a setter and the error. Wire it to a native input or your design system once, then reuse it in every form.',
+    file: 'profile-form.tsx',
+    title: 'A form in a few lines',
+    body: 'A provider, useForm to submit, and your own inputs. Write each input once with useField, styled your way, then reuse it in every form.',
     href: '/docs/getting-started',
     code: `import { FormProvider, useField, useForm } from 'wit-form';
 
-function TextField({ name, label }: { name: string; label: string }) {
-  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
-    name,
-    validate: (value) => (!value ? 'Required' : null),
-  });
-
-  return (
-    <label>
-      {label}
-      <input
-        value={fieldValue ?? ''}
-        onChange={(e) => setFieldValue(e.target.value)}
-        onBlur={onBlur}
-      />
-      {error && <span role="alert">{error}</span>}
-    </label>
-  );
-}
+// A whole form: a provider, a submit handler and the fields
+export const ProfileForm = () => (
+  <FormProvider>
+    <Profile />
+  </FormProvider>
+);
 
 function Profile() {
   const { handleSubmit } = useForm({ onSubmit: save });
@@ -41,7 +29,24 @@ function Profile() {
   );
 }
 
-export const ProfileForm = () => <FormProvider><Profile /></FormProvider>;`,
+// Write each input once, styled your way, and reuse it everywhere
+function TextField({ name, label }: { name: string; label: string }) {
+  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
+    name,
+    validate: (value) => (!value ? 'Required' : null),
+  });
+  return (
+    <label>
+      {label}
+      <input
+        value={fieldValue ?? ''}
+        onChange={(e) => setFieldValue(e.target.value)}
+        onBlur={onBlur}
+      />
+      {error && <span role="alert">{error}</span>}
+    </label>
+  );
+}`,
   },
   {
     id: 'arrays',

@@ -95,17 +95,6 @@ const questions: { q: string; a: ReactNode }[] = [
       </>
     ),
   },
-  {
-    q: 'I use react-recoil-form. How do I switch?',
-    a: (
-      <>
-        Wit Form is its successor, with the same API on Jotai in place of
-        Recoil. Swap the packages, change the imports, and remove any{' '}
-        <Code>RecoilRoot</Code> you added only for forms. See the{' '}
-        <DocLink href="/docs/guides/migrating">migration guide</DocLink>.
-      </>
-    ),
-  },
 ];
 
 export function Faq() {
@@ -128,7 +117,7 @@ export function Faq() {
         />
         <div className="divide-y border-y">
           {questions.map((item) => (
-            <details key={item.q} className="group">
+            <details key={item.q} className="faq-item group">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-6 rounded-md py-5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 [&::-webkit-details-marker]:hidden">
                 {item.q}
                 <Plus

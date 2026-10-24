@@ -6,32 +6,50 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
-import { FormProvider, useField, useForm } from 'wit-form';
+import { flushSync } from 'react-dom';
+import { FormProvider, useField, useForm, useFormContext } from 'wit-form';
 import { cn } from '@/lib/cn';
 
 type Side = 'shared' | 'atoms';
+type DemoField = { name: string; label: string; value: string };
 
-const FIELDS = [
-  { name: 'name', label: 'Name' },
-  { name: 'email', label: 'Email', value: 'ada@example.com' },
-  { name: 'phone', label: 'Phone', value: '+44 20 7946 0958' },
-  { name: 'company', label: 'Company', value: 'Analytical Engines' },
+// Short values, so they still fit in the narrow columns on phones
+const BASE_FIELDS: DemoField[] = [
+  { name: 'name', label: 'Name', value: '' },
+  { name: 'email', label: 'Email', value: 'ada@mail.io' },
+  { name: 'phone', label: 'Phone', value: '020 7946' },
+  { name: 'company', label: 'Company', value: 'Engines Ltd' },
   { name: 'role', label: 'Role', value: 'Engineer' },
   { name: 'website', label: 'Website', value: 'ada.dev' },
-  { name: 'street', label: 'Street', value: '12 St James’s Sq' },
+  { name: 'street', label: 'Street', value: '12 St James' },
   { name: 'city', label: 'City', value: 'London' },
   { name: 'zip', label: 'Postcode', value: 'SW1Y 4JH' },
-  { name: 'country', label: 'Country', value: 'United Kingdom' },
+  { name: 'country', label: 'Country', value: 'UK' },
   { name: 'team', label: 'Team size', value: '11–50' },
 ];
 
-const INITIAL_VALUES: Record<string, string> = Object.fromEntries(
-  FIELDS.map((field) => [field.name, field.value ?? ''])
-);
+// Big enough by default for the gap to show at a glance; the verdict offers 1,000
+const DEFAULT_COUNT = 100;
+const LARGE_COUNT = 1000;
+
+function makeFields(count: number): DemoField[] {
+  const extra = Array.from(
+    { length: Math.max(0, count - BASE_FIELDS.length) },
+    (_, i) => {
+      const n = BASE_FIELDS.length + i + 1;
+      return { name: `field${n}`, label: `Field ${n}`, value: `Value ${n}` };
+    }
+  );
+  return [...BASE_FIELDS.slice(0, count), ...extra];
+}
+
+const valuesOf = (fields: DemoField[]) =>
+  Object.fromEntries(fields.map((field) => [field.name, field.value]));
 
 const SAMPLE_TEXT = 'Ada Lovelace';
 
@@ -41,18 +59,19 @@ const FLASH = {
 };
 
 /**
- * Mirrors keystrokes into both forms and tallies the renders each one does.
- * It lives outside React state, so the section itself never re-renders and the tallies stay honest.
+ * Sends each keystroke to both forms, one after the other, and tallies the renders and the time
+ * each form spends on it. It lives outside React state, so the section itself never re-renders.
  */
 function createDemoStore() {
-  const empty = { keystrokes: 0, shared: 0, atoms: 0 };
+  const empty = { keystrokes: 0, shared: 0, atoms: 0, sharedMs: 0, atomsMs: 0 };
   let snapshot = empty;
-  let ready = false;
-  // While the form restores its starting values, those renders aren't the visitor's doing
-  let restoring: ReturnType<typeof setTimeout> | undefined;
+  let fields = makeFields(DEFAULT_COUNT);
+  // Renders while the forms mount or restore aren't the visitor's doing, so they don't count
+  let settling: ReturnType<typeof setTimeout> | undefined;
+  let afterSettle: (() => void) | undefined;
   let playback: ReturnType<typeof setInterval> | undefined;
   const listeners = new Set<() => void>();
-  const typers = new Set<(name: string, value: string) => void>();
+  const setters = new Map<Side, (name: string, value: string) => void>();
   const notify = () => listeners.forEach((listener) => listener());
 
   const stopPlayback = () => {
@@ -60,27 +79,52 @@ function createDemoStore() {
     playback = undefined;
   };
 
-  const stopRestoring = () => {
-    clearTimeout(restoring);
-    restoring = undefined;
-  };
-
   const reset = () => {
     snapshot = empty;
-    ready = true;
     notify();
+  };
+
+  /** Waits until the forms have stopped rendering for a moment, then zeroes the tallies */
+  const scheduleSettle = () => {
+    clearTimeout(settling);
+    settling = setTimeout(() => {
+      settling = undefined;
+      reset();
+      const then = afterSettle;
+      afterSettle = undefined;
+      then?.();
+    }, 200);
+  };
+
+  const settle = (then?: () => void) => {
+    stopPlayback();
+    afterSettle = then;
+    scheduleSettle();
   };
 
   const type = (name: string, value: string) => {
-    snapshot = { ...snapshot, keystrokes: snapshot.keystrokes + 1 };
+    const time = { shared: 0, atoms: 0 };
+    // One form at a time, flushed right away, so each form's render time is its own
+    for (const side of ['shared', 'atoms'] as const) {
+      const set = setters.get(side);
+      if (!set) continue;
+      const start = performance.now();
+      flushSync(() => set(name, value));
+      time[side] = performance.now() - start;
+    }
+    snapshot = {
+      ...snapshot,
+      keystrokes: snapshot.keystrokes + 1,
+      sharedMs: snapshot.sharedMs + time.shared,
+      atomsMs: snapshot.atomsMs + time.atoms,
+    };
     notify();
-    typers.forEach((setValue) => setValue(name, value));
   };
 
   return {
-    /** Whether renders right now come from the visitor, so they count and flash */
+    /** Whether renders right now come from typing, so they count and flash */
     get counting() {
-      return ready && !restoring;
+      return !settling;
     },
     subscribe(listener: () => void) {
       listeners.add(listener);
@@ -89,42 +133,42 @@ function createDemoStore() {
     getSnapshot: () => snapshot,
     getServerSnapshot: () => empty,
     bump(side: Side) {
-      if (restoring) return;
+      if (settling) {
+        scheduleSettle();
+        return;
+      }
       snapshot = { ...snapshot, [side]: snapshot[side] + 1 };
       notify();
     },
-    /** Zeroes the tallies; also called once mounting settles, so they open at 0 */
-    reset,
-    onType(setValue: (name: string, value: string) => void) {
-      typers.add(setValue);
+    register(side: Side, set: (name: string, value: string) => void) {
+      setters.set(side, set);
       return () => {
-        typers.delete(setValue);
+        setters.delete(side);
       };
     },
+    settle,
     type(name: string, value: string) {
       stopPlayback();
-      // The first keystroke can beat the settle or restore timer, so start counting from it
-      if (!ready || restoring) {
-        stopRestoring();
+      // The visitor's first keystroke can beat the settle timer, so start counting from it
+      if (settling) {
+        clearTimeout(settling);
+        settling = undefined;
+        afterSettle = undefined;
         reset();
       }
       type(name, value);
     },
+    /** Switches both forms to a new number of fields; they remount with fresh values */
+    resize(count: number) {
+      fields = makeFields(count);
+      settle();
+    },
     /** Puts every field back to its starting value, then zeroes the tallies */
     restore(then?: () => void) {
-      stopPlayback();
-      stopRestoring();
-      for (const field of FIELDS) {
-        typers.forEach((setValue) =>
-          setValue(field.name, INITIAL_VALUES[field.name])
-        );
+      settle(then);
+      for (const field of fields) {
+        setters.forEach((set) => set(field.name, field.value));
       }
-      // Wit Form settles each field over a couple of renders, so wait them out
-      restoring = setTimeout(() => {
-        restoring = undefined;
-        reset();
-        then?.();
-      }, 150);
     },
     play() {
       this.restore(() => {
@@ -138,7 +182,7 @@ function createDemoStore() {
     },
     stop() {
       stopPlayback();
-      stopRestoring();
+      clearTimeout(settling);
     },
   };
 }
@@ -196,7 +240,7 @@ function FieldBox(props: {
 }) {
   const store = useDemo();
   const ref = useRenderFlash(props.side);
-  const formName = props.side === 'shared' ? 'shared form state' : 'Wit Form';
+  const formName = props.side === 'shared' ? 'one state object' : 'Wit Form';
   // Name is the empty, full-width field that invites the first keystroke
   const featured = props.name === 'name';
 
@@ -205,7 +249,7 @@ function FieldBox(props: {
       ref={ref}
       className={cn(
         'flex h-9 min-w-0 items-center gap-3 rounded-md border bg-fd-background/70 px-3 text-sm transition-colors hover:border-fd-foreground/25 focus-within:border-emerald-500/60 focus-within:ring-2 focus-within:ring-emerald-500/25',
-        featured && 'col-span-full border-fd-foreground/25'
+        featured && 'border-fd-foreground/25'
       )}
     >
       <span
@@ -230,29 +274,45 @@ function FieldBox(props: {
   );
 }
 
-/* Shared form state: one values object in context, read by every field */
+/** The Name field on top, the rest in a scroll box, so bigger forms don't stretch the page */
+function FieldGrid(props: {
+  fields: DemoField[];
+  render: (field: DemoField) => ReactNode;
+}) {
+  const [first, ...rest] = props.fields;
+  return (
+    <div className="flex flex-col gap-2">
+      {props.render(first)}
+      <div className="grid max-h-[13.5rem] grid-cols-2 gap-2 overflow-y-auto">
+        {rest.map(props.render)}
+      </div>
+    </div>
+  );
+}
 
-const SharedValues = createContext<Record<string, string>>(INITIAL_VALUES);
+/* One state object: every field reads it from context */
 
-function SharedField(props: { name: string; label: string }) {
+const SharedValues = createContext<Record<string, string>>({});
+
+function SharedField(props: { field: DemoField }) {
   const values = useContext(SharedValues);
   return (
     <FieldBox
       side="shared"
-      name={props.name}
-      label={props.label}
-      value={values[props.name]}
+      name={props.field.name}
+      label={props.field.label}
+      value={values[props.field.name] ?? ''}
     />
   );
 }
 
-function SharedForm() {
+function SharedForm(props: { fields: DemoField[] }) {
   const store = useDemo();
-  const [values, setValues] = useState(INITIAL_VALUES);
+  const [values, setValues] = useState(() => valuesOf(props.fields));
 
   useEffect(
     () =>
-      store.onType((name, value) =>
+      store.register('shared', (name, value) =>
         setValues((prev) => ({ ...prev, [name]: value }))
       ),
     [store]
@@ -260,75 +320,79 @@ function SharedForm() {
 
   return (
     <SharedValues.Provider value={values}>
-      <FieldGrid>
-        {FIELDS.map((field) => (
-          <SharedField key={field.name} name={field.name} label={field.label} />
-        ))}
-      </FieldGrid>
+      <FieldGrid
+        fields={props.fields}
+        render={(field) => <SharedField key={field.name} field={field} />}
+      />
     </SharedValues.Provider>
   );
 }
 
 /* Wit Form: each field subscribes to its own atom */
 
-function AtomField(props: { name: string; label: string }) {
-  const store = useDemo();
-  const { fieldValue, setFieldValue } = useField<string>({ name: props.name });
-
-  useEffect(
-    () =>
-      store.onType((name, value) => {
-        if (name === props.name) setFieldValue(value);
-      }),
-    [store, props.name, setFieldValue]
-  );
-
+function AtomField(props: { field: DemoField }) {
+  const { fieldValue } = useField<string>({ name: props.field.name });
   return (
     <FieldBox
       side="atoms"
-      name={props.name}
-      label={props.label}
+      name={props.field.name}
+      label={props.field.label}
       value={fieldValue ?? ''}
     />
   );
 }
 
-function AtomFields() {
-  useForm({ initialValues: INITIAL_VALUES, onSubmit: () => {} });
+function AtomFields(props: { fields: DemoField[] }) {
+  const store = useDemo();
+  const initialValues = useMemo(() => valuesOf(props.fields), [props.fields]);
+  useForm({ initialValues, onSubmit: () => {} });
+  const { setValue } = useFormContext();
+
+  useEffect(
+    () => store.register('atoms', (name, value) => setValue(name, { value })),
+    [store, setValue]
+  );
+
   return (
-    <FieldGrid>
-      {FIELDS.map((field) => (
-        <AtomField key={field.name} name={field.name} label={field.label} />
-      ))}
-    </FieldGrid>
+    <FieldGrid
+      fields={props.fields}
+      render={(field) => <AtomField key={field.name} field={field} />}
+    />
   );
 }
 
-function AtomForm() {
+function AtomForm(props: { fields: DemoField[] }) {
   return (
     <FormProvider>
-      <AtomFields />
+      <AtomFields fields={props.fields} />
     </FormProvider>
   );
 }
 
-function FieldGrid(props: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-2">{props.children}</div>;
-}
+const formatMs = (ms: number) =>
+  ms < 10 ? ms.toFixed(1) : String(Math.round(ms));
 
-function RenderCount(props: { side: Side }) {
+/** Renders so far, and the average time per keystroke once there is one */
+function Tally(props: { side: Side; label?: string; className?: string }) {
   const tally = useTally();
   const ours = props.side === 'atoms';
+  const renders = tally[props.side];
+  const ms = ours ? tally.atomsMs : tally.sharedMs;
   return (
     <span
       className={cn(
-        'rounded-full px-2.5 py-0.5 font-mono text-xs tabular-nums',
+        'rounded-full px-2.5 py-0.5 font-mono text-xs whitespace-nowrap tabular-nums',
         ours
           ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-          : 'bg-rose-500/10 text-rose-600 dark:text-rose-300'
+          : 'bg-rose-500/10 text-rose-600 dark:text-rose-300',
+        props.className
       )}
     >
-      {tally[props.side]} {tally[props.side] === 1 ? 'render' : 'renders'}
+      {props.label && (
+        <span className="font-sans font-medium">{props.label}: </span>
+      )}
+      {renders.toLocaleString('en-US')} {renders === 1 ? 'render' : 'renders'}
+      {tally.keystrokes > 0 && ` · ${formatMs(ms / tally.keystrokes)} ms/key`}
     </span>
   );
 }
@@ -361,7 +425,7 @@ function Panel(props: {
         >
           {props.label}
         </span>
-        <RenderCount side={props.side} />
+        <Tally side={props.side} />
       </div>
 
       {props.children}
@@ -374,21 +438,24 @@ function Panel(props: {
   );
 }
 
-/** Window-style toolbar: what to do on the left, the controls on the right */
+/** Both tallies in one bar that stays on screen while the stacked forms scroll past, on phones */
+function StickyTally() {
+  return (
+    <div className="sticky top-14 z-10 flex flex-wrap items-center justify-center gap-2 border-b bg-fd-background/90 px-4 py-2 backdrop-blur md:hidden">
+      <Tally side="shared" label="One object" />
+      <Tally side="atoms" label="Wit Form" />
+    </div>
+  );
+}
+
 function Toolbar() {
   const store = useDemo();
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-fd-muted/40 px-4 py-2.5 sm:px-5">
-      <div className="flex items-center gap-3">
-        <div className="flex gap-1.5 max-sm:hidden" aria-hidden>
-          <span className="size-2.5 rounded-full bg-fd-foreground/15" />
-          <span className="size-2.5 rounded-full bg-fd-foreground/15" />
-          <span className="size-2.5 rounded-full bg-fd-foreground/15" />
-        </div>
-        <p className="text-sm text-fd-muted-foreground">
-          Type in either form. Keystrokes go to both, and the counters are real
-          React renders.
-        </p>
+    <div className="flex items-center justify-between gap-3 border-b bg-fd-muted/40 px-4 py-2.5 sm:px-5">
+      <div className="flex gap-1.5" aria-hidden>
+        <span className="size-2.5 rounded-full bg-fd-foreground/15" />
+        <span className="size-2.5 rounded-full bg-fd-foreground/15" />
+        <span className="size-2.5 rounded-full bg-fd-foreground/15" />
       </div>
       <div className="flex gap-2">
         <button
@@ -410,14 +477,27 @@ function Toolbar() {
   );
 }
 
-/** The punchline: the same keystrokes, side by side, in one sentence */
-function Verdict() {
+/** The punchline: the same keystrokes, side by side, in one sentence, with the size switch */
+function Verdict(props: { count: number; onResize: (count: number) => void }) {
   const tally = useTally();
+  const large = props.count >= LARGE_COUNT;
+  const resize = (
+    <button
+      type="button"
+      onClick={() => props.onResize(large ? DEFAULT_COUNT : LARGE_COUNT)}
+      className="font-medium text-emerald-700 underline decoration-emerald-500/40 underline-offset-4 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-300"
+    >
+      {large
+        ? `Back to ${DEFAULT_COUNT} fields`
+        : `Try ${LARGE_COUNT.toLocaleString('en-US')} fields`}
+    </button>
+  );
   if (tally.keystrokes === 0) {
     return (
-      <p className="text-center text-sm text-fd-muted-foreground">
-        Each form has {FIELDS.length} fields. Watch how many of them a single
-        keystroke wakes up.
+      <p className="text-center text-sm text-pretty text-fd-muted-foreground">
+        Each form has {props.count.toLocaleString('en-US')} fields. Type in
+        either one: keystrokes go to both, and the counters are real React
+        renders. {resize}
       </p>
     );
   }
@@ -426,44 +506,68 @@ function Verdict() {
     <p className="text-center text-sm text-pretty sm:text-base">
       <span className="font-medium">{keys}:</span>{' '}
       <span className="font-mono font-semibold tabular-nums text-rose-600 dark:text-rose-300">
-        {tally.shared}
+        {tally.shared.toLocaleString('en-US')}
       </span>{' '}
       field renders with one state object,{' '}
       <span className="font-mono font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
-        {tally.atoms}
+        {tally.atoms.toLocaleString('en-US')}
       </span>{' '}
-      with Wit Form.{' '}
-      <span className="text-fd-muted-foreground">
-        The gap grows with every field you add.
-      </span>
+      with Wit Form. {resize}
     </p>
   );
 }
 
 export function RenderComparison() {
   const [store] = useState(createDemoStore);
+  const [count, setCount] = useState(DEFAULT_COUNT);
+  const fields = useMemo(() => makeFields(count), [count]);
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  // Mounting renders every field a few times while Wit Form initialises its atoms, which says
-  // nothing about typing. Zero the tallies once that settles, unless the visitor already started.
+  // Mounting renders every field a few times, which says nothing about typing.
+  // Zero the tallies once that settles, unless the visitor already started typing.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (store.getSnapshot().keystrokes === 0) store.reset();
-    }, 300);
-    return () => {
-      clearTimeout(timer);
-      store.stop();
-    };
+    store.settle();
+    return () => store.stop();
   }, [store]);
 
+  // Most visitors don't type, so show the point once when the demo comes into view
+  useEffect(() => {
+    const root = rootRef.current;
+    if (
+      !root ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        observer.disconnect();
+        if (store.getSnapshot().keystrokes === 0) store.play();
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [store]);
+
+  const resize = (size: number) => {
+    if (size === count) return;
+    store.resize(size);
+    setCount(size);
+  };
+
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       <div
         aria-hidden
         className="absolute -inset-x-8 -inset-y-6 -z-10 rounded-[2.5rem] bg-gradient-to-b from-emerald-500/15 via-teal-500/5 to-transparent blur-2xl"
       />
       <DemoContext.Provider value={store}>
-        <div className="overflow-hidden rounded-2xl border bg-fd-background/80 shadow-2xl shadow-emerald-950/10 backdrop-blur">
+        {/* overflow-clip, not hidden, so the phone tally bar can stick to the viewport */}
+        <div className="overflow-clip rounded-2xl border bg-fd-background/80 shadow-2xl shadow-emerald-950/10 backdrop-blur">
           <Toolbar />
+          <StickyTally />
           <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
             <Panel
               side="shared"
@@ -471,7 +575,7 @@ export function RenderComparison() {
               title="Every field wakes up"
               body="Values live in one object, so each keystroke hands every field a new copy and they all render again, unless you add memo and selectors."
             >
-              <SharedForm />
+              <SharedForm key={count} fields={fields} />
             </Panel>
             <Panel
               side="atoms"
@@ -479,11 +583,11 @@ export function RenderComparison() {
               title="Only the field you touched"
               body="The input writes to its own atom. The rest of the form never hears about it, and there is nothing to memoize."
             >
-              <AtomForm />
+              <AtomForm key={count} fields={fields} />
             </Panel>
           </div>
           <div className="border-t px-4 py-3 sm:px-5">
-            <Verdict />
+            <Verdict count={count} onResize={resize} />
           </div>
         </div>
       </DemoContext.Provider>
