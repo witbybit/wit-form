@@ -99,3 +99,15 @@ html > body[data-scroll-locked] {
     transition: none;
   }
 }
+
+/* Landing trip demo: the destination list opening */
+@keyframes select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

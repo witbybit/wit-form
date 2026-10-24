@@ -16,29 +16,26 @@ import { FormProvider, useField, useForm, useFormContext } from 'wit-form';
 import { cn } from '@/lib/cn';
 
 type Side = 'shared' | 'atoms';
-type DemoField = { name: string; label: string; value: string };
+type DemoField = { name: string; label: string; sample: string };
 
-// Short values, so they still fit in the narrow columns on phones
-const BASE_FIELDS: DemoField[] = [
-  { name: 'name', label: 'Name', value: '' },
-  { name: 'email', label: 'Email', value: 'ada@mail.io' },
-  { name: 'phone', label: 'Phone', value: '020 7946' },
-  { name: 'company', label: 'Company', value: 'Engines Ltd' },
-  { name: 'role', label: 'Role', value: 'Engineer' },
-  { name: 'website', label: 'Website', value: 'ada.dev' },
-  { name: 'street', label: 'Street', value: '12 St James' },
-  { name: 'city', label: 'City', value: 'London' },
-  { name: 'zip', label: 'Postcode', value: 'SW1Y 4JH' },
-  { name: 'country', label: 'Country', value: 'UK' },
-  { name: 'team', label: 'Team size', value: '11–50' },
+// Every field starts empty; "Type for me" fills in these samples, one field after another.
+// They're short, so they still fit in the narrow columns on phones.
+const FIELDS: DemoField[] = [
+  { name: 'name', label: 'Name', sample: 'Ada Lovelace' },
+  { name: 'email', label: 'Email', sample: 'ada@mail.io' },
+  { name: 'phone', label: 'Phone', sample: '020 7946' },
+  { name: 'company', label: 'Company', sample: 'Engines Ltd' },
+  { name: 'role', label: 'Role', sample: 'Engineer' },
+  { name: 'website', label: 'Website', sample: 'ada.dev' },
+  { name: 'street', label: 'Street', sample: '12 St James' },
+  { name: 'city', label: 'City', sample: 'London' },
+  { name: 'zip', label: 'Postcode', sample: 'SW1Y 4JH' },
+  { name: 'country', label: 'Country', sample: 'UK' },
+  { name: 'team', label: 'Team size', sample: '11–50' },
 ];
 
-const FIELDS = BASE_FIELDS;
-
 const valuesOf = (fields: DemoField[]) =>
-  Object.fromEntries(fields.map((field) => [field.name, field.value]));
-
-const SAMPLE_TEXT = 'Ada Lovelace';
+  Object.fromEntries(fields.map((field) => [field.name, '']));
 
 const FLASH = {
   shared: 'rgb(244 63 94 / 0.55)',
@@ -148,17 +145,24 @@ function createDemoStore() {
     restore(then?: () => void) {
       settle(then);
       for (const field of FIELDS) {
-        setters.forEach((set) => set(field.name, field.value));
+        setters.forEach((set) => set(field.name, ''));
       }
     },
     play() {
       this.restore(() => {
-        let length = 0;
+        // Every keystroke of the whole form, in order
+        const keys = FIELDS.flatMap((field) =>
+          [...field.sample].map((_, i) => [
+            field.name,
+            field.sample.slice(0, i + 1),
+          ])
+        );
+        let next = 0;
         playback = setInterval(() => {
-          length += 1;
-          type('name', SAMPLE_TEXT.slice(0, length));
-          if (length === SAMPLE_TEXT.length) stopPlayback();
-        }, 110);
+          const [name, value] = keys[next++];
+          type(name, value);
+          if (next === keys.length) stopPlayback();
+        }, 45);
       });
     },
     stop() {

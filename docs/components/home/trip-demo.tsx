@@ -1,7 +1,14 @@
 'use client';
 
-import { ArrowUp, Plus, X } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { ArrowUp, Check, ChevronDown, Plus, X } from 'lucide-react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import {
   FormProvider,
   useField,
@@ -101,26 +108,142 @@ function Field(props: {
   );
 }
 
+const options = Object.entries(destinations);
+
+/**
+ * A select in the style of shadcn/ui: a trigger button and a list that opens below it.
+ * Arrow keys, Home and End move, Enter or Space picks, Escape closes.
+ */
 function DestinationSelect() {
-  const { fieldValue, setFieldValue } = useField<string>({
+  const { fieldValue, setFieldValue, onBlur, ref } = useField<string>({
     name: 'destination',
   });
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const baseId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const selected = options.findIndex(([value]) => value === fieldValue);
+
+  // A click anywhere else closes the list
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
+  const show = () => {
+    setActive(Math.max(0, selected));
+    setOpen(true);
+  };
+  const choose = (index: number) => {
+    setFieldValue(options[index][0]);
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault();
+        show();
+      }
+      return;
+    }
+    const last = options.length - 1;
+    const moves: Record<string, number> = {
+      ArrowDown: Math.min(last, active + 1),
+      ArrowUp: Math.max(0, active - 1),
+      Home: 0,
+      End: last,
+    };
+    if (e.key in moves) {
+      e.preventDefault();
+      setActive(moves[e.key]);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      choose(active);
+    } else if (e.key === 'Escape' || e.key === 'Tab') {
+      setOpen(false);
+    }
+  };
+
   return (
-    <label className="flex flex-col gap-1 text-xs text-fd-muted-foreground">
-      Destination
-      <select
+    <div ref={rootRef} className="relative flex flex-col gap-1">
+      <span id={`${baseId}-label`} className="text-xs text-fd-muted-foreground">
+        Destination
+      </span>
+      <button
+        ref={(element) => {
+          triggerRef.current = element;
+          ref(element);
+        }}
+        type="button"
+        role="combobox"
         data-field="destination"
-        value={fieldValue ?? ''}
-        onChange={(e) => setFieldValue(e.target.value)}
-        className={cn(inputClass, 'text-fd-foreground')}
+        aria-labelledby={`${baseId}-label`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={`${baseId}-list`}
+        aria-activedescendant={open ? `${baseId}-option-${active}` : undefined}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={onKeyDown}
+        onBlur={onBlur}
+        className={cn(
+          inputClass,
+          'flex items-center justify-between text-left text-fd-foreground',
+          open && 'border-emerald-500/60 ring-2 ring-emerald-500/20'
+        )}
       >
-        {Object.entries(destinations).map(([value, destination]) => (
-          <option key={value} value={value}>
-            {destination.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        {selected >= 0 ? options[selected][1].label : 'Pick a destination'}
+        <ChevronDown
+          className={cn(
+            'size-4 text-fd-muted-foreground transition-transform',
+            open && 'rotate-180'
+          )}
+        />
+      </button>
+      {open && (
+        <ul
+          id={`${baseId}-list`}
+          role="listbox"
+          aria-labelledby={`${baseId}-label`}
+          className="absolute top-full z-20 mt-1 w-full rounded-md border bg-fd-popover p-1 text-fd-popover-foreground shadow-lg motion-safe:animate-[select-in_120ms_ease-out]"
+        >
+          {options.map(([value, destination], index) => (
+            <li
+              key={value}
+              id={`${baseId}-option-${index}`}
+              role="option"
+              data-value={value}
+              aria-selected={index === selected}
+              onPointerMove={() => setActive(index)}
+              onClick={() => choose(index)}
+              className={cn(
+                'flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm',
+                index === active && 'bg-fd-accent text-fd-accent-foreground'
+              )}
+            >
+              <Check
+                className={cn(
+                  'size-3.5 shrink-0',
+                  index === selected ? 'opacity-100' : 'opacity-0'
+                )}
+              />
+              <span className="flex-1">{destination.label}</span>
+              {destination.abroad && (
+                <span className="text-xs text-fd-muted-foreground">
+                  Passport needed
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -279,20 +402,13 @@ function BookingForm() {
 }
 
 /** Sets an input's value the way typing does, so React and the form see a real change */
-function typeInto(
-  element: HTMLInputElement | HTMLSelectElement,
-  value: string
-) {
+function typeInto(element: HTMLInputElement, value: string) {
   const prototype = Object.getPrototypeOf(element);
   Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(
     element,
     value
   );
-  element.dispatchEvent(
-    new Event(element instanceof HTMLSelectElement ? 'change' : 'input', {
-      bubbles: true,
-    })
-  );
+  element.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 export function TripDemo() {
@@ -314,11 +430,12 @@ export function TripDemo() {
       find<HTMLInputElement>('[data-traveler="1"] [data-field="age"]');
     at(900, () => age() && typeInto(age()!, '1'));
     at(1150, () => age() && typeInto(age()!, '16'));
-    at(2400, () => {
-      const select = find<HTMLSelectElement>('[data-field="destination"]');
-      if (select) typeInto(select, 'kyoto');
-    });
-    at(3600, () => find<HTMLButtonElement>('button[type="submit"]')?.click());
+    // Open the destination list and pick Kyoto, the way a visitor would
+    at(2300, () =>
+      find<HTMLButtonElement>('[data-field="destination"]')?.click()
+    );
+    at(3000, () => find<HTMLElement>('[data-value="kyoto"]')?.click());
+    at(4200, () => find<HTMLButtonElement>('button[type="submit"]')?.click());
 
     const stop = () => {
       stopped = true;
