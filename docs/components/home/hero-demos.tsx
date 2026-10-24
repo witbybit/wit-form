@@ -17,21 +17,21 @@ import { TripDemo } from './trip-demo';
 
 const demos: { key: HeroDemoKey; label: string; caption: string }[] = [
   {
-    key: 'payroll',
-    label: 'Big forms',
-    caption: 'A 500-person payroll. A keystroke renders 3 of 1,501 components.',
-  },
-  {
     key: 'comparison',
     label: 'Fewer re-renders',
     caption:
       'The same keystrokes in two forms. One state object re-renders every field, Wit Form only the one you typed in.',
   },
   {
+    key: 'payroll',
+    label: 'Big forms',
+    caption: 'A 500-person payroll. A keystroke renders 3 of 1,501 components.',
+  },
+  {
     key: 'complex',
     label: 'Complex forms',
     caption:
-      'Lists, one Zod schema, and a field that only appears for trips abroad.',
+      'Three steps, one form: strings, numbers, booleans, lists and nested objects, checked step by step.',
   },
 ];
 

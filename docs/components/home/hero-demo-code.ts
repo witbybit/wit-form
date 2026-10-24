@@ -46,27 +46,33 @@ function Field({ name }: { name: string }) {
 }`,
   },
   complex: {
-    file: 'booking.tsx',
-    code: `const bookingSchema = z.object({
-  destination: z.string(),
-  travelers: z
-    .array(
-      z.object({
-        name: z.string().min(1, 'Required'),
-        age: z.number().min(18, 'Must be 18+'),
-      })
-    )
-    .min(1, 'Add a traveler'),
+    file: 'booking-wizard.tsx',
+    code: `// One form across three steps. Steps that aren't shown keep their values.
+const { handleSubmit, validateFields } = useForm({
+  schema: bookingSchema,
+  skipUnregister: true,
+  onSubmit,
 });
 
-// Each schema error lands on its field, in the right row
-const { handleSubmit } = useForm({ schema: bookingSchema, onSubmit });
+// "Next" checks only the current step's fields
+const next = () => {
+  if (validateFields(steps[step].fields).length === 0) setStep(step + 1);
+};
+
+// Any kind of value, in any shape
+useField<string>({ name: 'destination' });
+useField<number>({ name: 'nights' });
+useField<boolean>({ name: 'flexibleDates' });
+useField<string[]>({ name: 'extras' });
+useField<string>({ name: 'contact.email' }); // { contact: { email } }
+
+// A list of rows, each with its own fields
 const { fieldArrayProps, append, swap, remove } = useFieldArray({
   name: 'travelers',
   fieldNames: ['name', 'age', 'passport'],
 });
 
-// Rendered only for trips abroad. Hidden, it drops out of the values.
+// Only asked for trips abroad, with a rule that reads the destination
 useField({
   name: 'passport',
   ancestors,

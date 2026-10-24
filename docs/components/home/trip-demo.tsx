@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUp, Check, ChevronDown, Plus, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, Minus, Plus, X } from 'lucide-react';
 import {
   useEffect,
   useId,
@@ -33,6 +33,8 @@ const isAbroad = (destination: unknown) =>
 // One schema for the whole booking. Its errors land on the matching fields, row by row
 const bookingSchema = z.object({
   destination: z.string('Pick a destination'),
+  tripType: z.enum(['leisure', 'business']),
+  nights: z.number().min(1),
   travelers: z
     .array(
       z.object({
@@ -41,6 +43,7 @@ const bookingSchema = z.object({
       })
     )
     .min(1, 'Add a traveler'),
+  contact: z.object({ email: z.email('Enter a valid email') }),
 });
 
 // A plain rule next to the schema: only trips abroad need a passport
@@ -253,6 +256,180 @@ function useAbroad() {
   return isAbroad(values.destination);
 }
 
+/* Small inputs for other kinds of values: a choice, a number, booleans and a list of strings */
+
+function TripType() {
+  const { fieldValue, setFieldValue } = useField<string>({ name: 'tripType' });
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-1">
+      <span id={id} className="text-xs text-fd-muted-foreground">
+        Trip type
+      </span>
+      <div
+        role="radiogroup"
+        aria-labelledby={id}
+        className="grid grid-cols-2 rounded-md border bg-fd-muted/40 p-0.5"
+      >
+        {['Leisure', 'Business'].map((label) => {
+          const value = label.toLowerCase();
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={fieldValue === value}
+              onClick={() => setFieldValue(value)}
+              className={cn(
+                'h-7 rounded text-sm transition',
+                fieldValue === value
+                  ? 'bg-fd-background font-medium shadow-sm'
+                  : 'text-fd-muted-foreground hover:text-fd-foreground'
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Nights() {
+  const { fieldValue = 1, setFieldValue } = useField<number>({
+    name: 'nights',
+  });
+  const id = useId();
+  const step = (by: number) =>
+    setFieldValue(Math.min(30, Math.max(1, fieldValue + by)));
+  return (
+    <div className="flex flex-col gap-1">
+      <span id={id} className="text-xs text-fd-muted-foreground">
+        Nights
+      </span>
+      <div
+        role="group"
+        aria-labelledby={id}
+        className="flex h-8 items-center justify-between rounded-md border bg-fd-background px-1"
+      >
+        <button
+          type="button"
+          aria-label="One night fewer"
+          onClick={() => step(-1)}
+          className="grid size-6 place-items-center rounded text-fd-muted-foreground hover:bg-fd-accent"
+        >
+          <Minus className="size-3.5" />
+        </button>
+        <span className="text-sm tabular-nums" aria-live="polite">
+          {fieldValue}
+        </span>
+        <button
+          type="button"
+          aria-label="One more night"
+          onClick={() => step(1)}
+          className="grid size-6 place-items-center rounded text-fd-muted-foreground hover:bg-fd-accent"
+        >
+          <Plus className="size-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Switch(props: { name: string; label: string }) {
+  const { fieldValue, setFieldValue } = useField<boolean>({
+    name: props.name,
+  });
+  return (
+    <label className="flex items-center justify-between gap-3 text-sm">
+      {props.label}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={!!fieldValue}
+        onClick={() => setFieldValue(!fieldValue)}
+        className={cn(
+          'relative h-5 w-9 shrink-0 rounded-full transition',
+          fieldValue ? 'bg-emerald-600' : 'bg-fd-muted-foreground/30'
+        )}
+      >
+        <span
+          className={cn(
+            'absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow transition',
+            fieldValue && 'translate-x-4'
+          )}
+        />
+      </button>
+    </label>
+  );
+}
+
+function Checkbox(props: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={props.checked}
+        onChange={(e) => props.onChange(e.target.checked)}
+        className="size-4 accent-emerald-600"
+      />
+      {props.label}
+    </label>
+  );
+}
+
+const extras = [
+  { value: 'insurance', label: 'Travel insurance' },
+  { value: 'pickup', label: 'Airport pickup' },
+  { value: 'lounge', label: 'Lounge access' },
+];
+
+/** One field whose value is a list of strings */
+function Extras() {
+  const { fieldValue = [], setFieldValue } = useField<string[]>({
+    name: 'extras',
+  });
+  return (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="mb-1 text-xs text-fd-muted-foreground">Extras</legend>
+      {extras.map((extra) => (
+        <Checkbox
+          key={extra.value}
+          label={extra.label}
+          checked={fieldValue.includes(extra.value)}
+          onChange={(checked) =>
+            setFieldValue(
+              checked
+                ? [...fieldValue, extra.value]
+                : fieldValue.filter((value) => value !== extra.value)
+            )
+          }
+        />
+      ))}
+    </fieldset>
+  );
+}
+
+function Newsletter() {
+  const { fieldValue, setFieldValue } = useField<boolean>({
+    name: 'preferences.newsletter',
+  });
+  return (
+    <Checkbox
+      label="Send me travel tips"
+      checked={!!fieldValue}
+      onChange={setFieldValue}
+    />
+  );
+}
+
+/* The steps */
+
 function Traveler(props: {
   rowId: number;
   index: number;
@@ -324,6 +501,61 @@ function Traveler(props: {
   );
 }
 
+function TripStep() {
+  return (
+    <div className="flex flex-col gap-4">
+      <DestinationSelect />
+      <div className="grid grid-cols-2 gap-3">
+        <TripType />
+        <Nights />
+      </div>
+      <Switch name="flexibleDates" label="My dates are flexible" />
+    </div>
+  );
+}
+
+function TravelersStep(props: { travelers: ReturnType<typeof useFieldArray> }) {
+  const { fieldArrayProps, append, swap, remove, error } = props.travelers;
+  return (
+    <div className="flex flex-col gap-2">
+      {fieldArrayProps.rowIds.map((rowId, index) => (
+        <Traveler
+          key={rowId}
+          rowId={rowId}
+          index={index}
+          onMoveUp={index > 0 ? () => swap(index - 1, index) : undefined}
+          onRemove={() => remove(index)}
+        />
+      ))}
+      {error && (
+        <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>
+      )}
+      <button
+        type="button"
+        onClick={() => append()}
+        className="inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
+      >
+        <Plus className="size-3.5" /> Add traveler
+      </button>
+    </div>
+  );
+}
+
+function ExtrasStep() {
+  return (
+    <div className="flex flex-col gap-4">
+      <Extras />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Field name="contact.email" label="Email" placeholder="Email" />
+        <Field name="contact.phone" label="Phone" placeholder="Phone" />
+      </div>
+      <Newsletter />
+    </div>
+  );
+}
+
+const steps = ['Trip', 'Travelers', 'Extras'];
+
 /** The live values, nested exactly as onSubmit will receive them */
 function ValuesPanel(props: { submitted: boolean }) {
   const values = useFormValues();
@@ -332,69 +564,139 @@ function ValuesPanel(props: { submitted: boolean }) {
       <div className="border-b border-white/10 px-4 py-2 font-mono text-[11px] text-zinc-400">
         {props.submitted ? 'onSubmit(values)' : 'useFormValues()'}
       </div>
-      <pre className="flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed text-emerald-300/90">
+      <pre className="max-h-[26rem] flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed text-emerald-300/90">
         {JSON.stringify(values, null, 2)}
       </pre>
     </div>
   );
 }
 
-function BookingForm() {
+function BookingWizard() {
+  const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
-  const { handleSubmit } = useForm({
+  const { handleSubmit, validateFields } = useForm({
     initialValues: {
       destination: 'denver',
+      tripType: 'leisure',
+      nights: 4,
+      flexibleDates: false,
       travelers: [{ name: 'Ada Lovelace', age: 36 }, { name: 'Alan Turing' }],
+      extras: ['insurance'],
+      preferences: { newsletter: true },
     },
     schema: bookingSchema,
     mode: 'onChange',
+    // Steps that aren't shown keep their values
+    skipUnregister: true,
     // Keep the page where it is; the visitor didn't ask to be scrolled
     shouldFocusError: false,
     onSubmit: () => setSubmitted(true),
   });
-  const { fieldArrayProps, append, swap, remove, error } = useFieldArray({
+  // The list lives here, so "Next" can check each row's fields
+  const travelers = useFieldArray({
     name: 'travelers',
     fieldNames: ['name', 'age', 'passport'],
   });
+  const abroad = useAbroad();
+
+  const stepFields = () => {
+    if (step === 0) return ['destination', 'tripType', 'nights'];
+    if (step === 2) return ['contact.email'];
+    const rowFields = abroad ? ['name', 'age', 'passport'] : ['name', 'age'];
+    return [
+      'travelers',
+      ...travelers.fieldArrayProps.rowIds.flatMap((rowId) =>
+        rowFields.map((name) => ({
+          name,
+          type: 'field' as const,
+          ancestors: [{ name: 'travelers', rowId }],
+        }))
+      ),
+    ];
+  };
+
+  // "Next" checks only the fields of the current step
+  const next = () => {
+    if (validateFields(stepFields()).length === 0) setStep(step + 1);
+  };
 
   return (
     <div className="grid md:grid-cols-[1.35fr_1fr]">
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="flex flex-col gap-4 p-4 sm:p-5"
+        className="flex min-h-[24rem] flex-col gap-5 p-4 sm:p-5"
       >
-        <DestinationSelect />
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-xs text-fd-muted-foreground">
-            Travelers
-          </legend>
-          {fieldArrayProps.rowIds.map((rowId, index) => (
-            <Traveler
-              key={rowId}
-              rowId={rowId}
-              index={index}
-              onMoveUp={index > 0 ? () => swap(index - 1, index) : undefined}
-              onRemove={() => remove(index)}
-            />
+        <ol className="flex items-center gap-2 text-xs">
+          {steps.map((label, index) => (
+            <li key={label} className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={index > step}
+                aria-current={index === step ? 'step' : undefined}
+                onClick={() => setStep(index)}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full py-0.5 pr-2.5 pl-0.5 transition',
+                  index === step
+                    ? 'bg-fd-accent font-medium text-fd-foreground'
+                    : 'text-fd-muted-foreground enabled:hover:text-fd-foreground'
+                )}
+              >
+                <span
+                  className={cn(
+                    'grid size-5 place-items-center rounded-full text-[10px] font-semibold',
+                    index < step
+                      ? 'bg-emerald-600 text-white'
+                      : index === step
+                        ? 'bg-fd-foreground text-fd-background'
+                        : 'border'
+                  )}
+                >
+                  {index < step ? <Check className="size-3" /> : index + 1}
+                </span>
+                {label}
+              </button>
+              {index < steps.length - 1 && (
+                <span aria-hidden className="h-px w-4 bg-fd-border" />
+              )}
+            </li>
           ))}
-          {error && (
-            <p className="text-xs text-rose-600 dark:text-rose-300">{error}</p>
+        </ol>
+
+        <div className="flex-1">
+          {step === 0 && <TripStep />}
+          {step === 1 && <TravelersStep travelers={travelers} />}
+          {step === 2 && <ExtrasStep />}
+        </div>
+
+        <div className="flex gap-2">
+          {step > 0 && (
+            <button
+              type="button"
+              onClick={() => setStep(step - 1)}
+              className="h-9 rounded-md px-4 text-sm text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
+            >
+              Back
+            </button>
           )}
-          <button
-            type="button"
-            onClick={() => append()}
-            className="inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
-          >
-            <Plus className="size-3.5" /> Add traveler
-          </button>
-        </fieldset>
-        <button
-          type="submit"
-          className="mt-auto inline-flex h-9 items-center justify-center rounded-md bg-fd-foreground text-sm font-medium text-fd-background transition hover:opacity-90"
-        >
-          Book trip
-        </button>
+          {step < steps.length - 1 ? (
+            <button
+              type="button"
+              data-action="next"
+              onClick={next}
+              className="ml-auto h-9 rounded-md bg-fd-foreground px-5 text-sm font-medium text-fd-background transition hover:opacity-90"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="ml-auto h-9 rounded-md bg-fd-foreground px-5 text-sm font-medium text-fd-background transition hover:opacity-90"
+            >
+              {submitted ? 'Booked ✓' : 'Book trip'}
+            </button>
+          )}
+        </div>
       </form>
       <ValuesPanel submitted={submitted} />
     </div>
@@ -414,37 +716,39 @@ function typeInto(element: HTMLInputElement, value: string) {
 export function TripDemo() {
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // A short scripted visit: an underage traveler, a trip abroad, then booking
+  // A short scripted visit: pick Kyoto, move on, add an underage traveler, try to continue
   useEffect(() => {
     const root = rootRef.current;
-    if (!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    if (
+      !root ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
       return;
+    }
     const timers: ReturnType<typeof setTimeout>[] = [];
     let stopped = false;
     const at = (ms: number, step: () => void) =>
       timers.push(setTimeout(() => !stopped && step(), ms));
     const find = <T extends Element>(selector: string) =>
       root.querySelector<T>(selector);
-
+    const click = (selector: string) => find<HTMLElement>(selector)?.click();
     const age = () =>
       find<HTMLInputElement>('[data-traveler="1"] [data-field="age"]');
-    at(900, () => age() && typeInto(age()!, '1'));
-    at(1150, () => age() && typeInto(age()!, '16'));
-    // Open the destination list and pick Kyoto, the way a visitor would
-    at(2300, () =>
-      find<HTMLButtonElement>('[data-field="destination"]')?.click()
-    );
-    at(3000, () => find<HTMLElement>('[data-value="kyoto"]')?.click());
-    at(4200, () => find<HTMLButtonElement>('button[type="submit"]')?.click());
+
+    at(900, () => click('[data-field="destination"]'));
+    at(1600, () => click('[data-value="kyoto"]'));
+    at(2600, () => click('[data-action="next"]'));
+    at(3500, () => age() && typeInto(age()!, '1'));
+    at(3750, () => age() && typeInto(age()!, '16'));
+    at(5000, () => click('[data-action="next"]'));
 
     const stop = () => {
       stopped = true;
       timers.forEach(clearTimeout);
     };
     root.addEventListener('pointerdown', stop, { once: true });
-    root.addEventListener('focusin', (e) => e.isTrusted && stop(), {
-      once: true,
-    });
+    // Only the visitor's own pointer or keys take over; the script's clicks and focus don't
+    root.addEventListener('keydown', stop, { once: true });
     return stop;
   }, []);
 
@@ -466,7 +770,7 @@ export function TripDemo() {
           </span>
         </div>
         <FormProvider>
-          <BookingForm />
+          <BookingWizard />
         </FormProvider>
       </div>
     </div>
