@@ -23,16 +23,16 @@ const demos: { key: HeroDemoKey; label: string; caption: string }[] = [
       'The same keystrokes in two forms. One state object re-renders every field, Wit Form only the one you typed in.',
   },
   {
-    key: 'sheet',
-    label: 'Large tables',
-    caption:
-      'A 500-row sheet of text, selects, numbers and checkboxes. Each edit renders only what depends on it.',
-  },
-  {
     key: 'complex',
     label: 'Complex forms',
     caption:
       'A three-step job application: text, email, a select, chips, a slider, a list, a file, a date, checkboxes and nested objects.',
+  },
+  {
+    key: 'sheet',
+    label: 'Large tables',
+    caption:
+      'A 500-row sheet of text, selects, numbers and checkboxes. Each edit renders only what depends on it.',
   },
 ];
 

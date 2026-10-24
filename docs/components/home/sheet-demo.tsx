@@ -27,6 +27,9 @@ import {
 import { cn } from '@/lib/cn';
 
 const ROWS = 500;
+// The first rows mount at once, enough to fill the view; the rest follow in batches
+const FIRST_ROWS = 30;
+const BATCH = 60;
 // Five fields and a total per row, plus the sheet, the remote count and the payroll total
 const componentsFor = (rows: number) => rows * 6 + 3;
 const COLUMNS =
@@ -150,6 +153,11 @@ function createInspector() {
     play(root: HTMLElement) {
       let step = 0;
       const run = () => {
+        // Not before every row has mounted, so mounting never counts as an edit
+        if (!writer || !ready) {
+          timer = setTimeout(run, 200);
+          return;
+        }
         const { row, column, values } = script[step % script.length];
         const cell = root
           .querySelectorAll('[data-sheet-row]')
@@ -443,7 +451,19 @@ function Sheet() {
   );
   useEffect(() => inspector.setRows(rowIds.length), [inspector, rowIds.length]);
 
+  // Show the first rows right away and mount the rest in batches between frames,
+  // so the sheet appears at once instead of after all 500 rows are built.
+  // Rows not mounted yet still count in the totals, from their initial values.
+  const [mounted, setMounted] = useState(FIRST_ROWS);
+  const allMounted = mounted >= rowIds.length;
   useEffect(() => {
+    if (allMounted) return;
+    const frame = requestAnimationFrame(() => setMounted((n) => n + BATCH));
+    return () => cancelAnimationFrame(frame);
+  }, [mounted, allMounted]);
+
+  useEffect(() => {
+    if (!allMounted) return;
     inspector.setWriter((row, column, value) =>
       setValue(
         {
@@ -455,7 +475,7 @@ function Sheet() {
       )
     );
     return () => inspector.setWriter(undefined);
-  }, [inspector, setValue, rowIds]);
+  }, [inspector, setValue, rowIds, allMounted]);
 
   return (
     <>
@@ -499,7 +519,7 @@ function Sheet() {
               Delete
             </span>
           </div>
-          {rowIds.map((rowId) => (
+          {rowIds.slice(0, mounted).map((rowId) => (
             <Row key={rowId} rowId={rowId} onRemove={removeRow} />
           ))}
         </div>
@@ -539,34 +559,18 @@ function InspectorBar() {
 
 export function SheetDemo() {
   const [inspector] = useState(createInspector);
-  const [visible, setVisible] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Mount the sheet only when it's about to come into view, then start the cursor once it settles
+  // The tab mounts this when it's already on screen; the cursor starts once every row is in
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    let started: ReturnType<typeof setTimeout> | undefined;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return;
-        observer.disconnect();
-        setVisible(true);
-        if (!reducedMotion())
-          started = setTimeout(() => inspector.play(root), 1000);
-      },
-      { rootMargin: '200px' }
-    );
-    observer.observe(root);
+    if (!reducedMotion()) inspector.play(root);
     // Only the visitor's own pointer or keys take over from the cursor
-    const stop = () => {
-      clearTimeout(started);
-      inspector.stop(root);
-    };
+    const stop = () => inspector.stop(root);
     root.addEventListener('pointerdown', stop);
     root.addEventListener('keydown', stop);
     return () => {
-      observer.disconnect();
       root.removeEventListener('pointerdown', stop);
       root.removeEventListener('keydown', stop);
       stop();
@@ -591,14 +595,10 @@ export function SheetDemo() {
               acme.app/budget
             </span>
           </div>
-          {visible ? (
-            // Nothing here reads the whole form's values, so that tracking can stay off
-            <FormProvider options={{ skipValuesObserver: true }}>
-              <Sheet />
-            </FormProvider>
-          ) : (
-            <div className="h-[24.5rem]" />
-          )}
+          {/* Nothing here reads the whole form's values, so that tracking can stay off */}
+          <FormProvider options={{ skipValuesObserver: true }}>
+            <Sheet />
+          </FormProvider>
           <InspectorBar />
         </div>
       </InspectorContext.Provider>
