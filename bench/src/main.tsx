@@ -2,10 +2,6 @@ import { Profiler, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { counter, makeRows, type Line } from './shared';
 
-const params = new URLSearchParams(location.search);
-const lib = params.get('lib') ?? 'wit';
-const rowCount = Number(params.get('rows') ?? 500);
-
 const loaders: Record<
   string,
   () => Promise<{ App: ComponentType<{ rows: Line[] }> }>
@@ -15,6 +11,18 @@ const loaders: Record<
   'rhf-controller': () => import('./libs/rhf-controller'),
   tanstack: () => import('./libs/tanstack'),
 };
+
+const params = new URLSearchParams(location.search);
+const lib = params.get('lib') ?? 'wit';
+const rowCount = Number(params.get('rows') ?? 500);
+
+// lib comes from the URL, so only accept the loaders' own keys, never inherited ones like "constructor"
+if (!Object.hasOwn(loaders, lib)) {
+  throw new Error(
+    `Unknown lib "${lib}". Use one of: ${Object.keys(loaders).join(', ')}`
+  );
+}
+const loadApp = loaders[lib];
 
 const state = { lastCommit: 0, lastFrame: 0, keyAt: 0, keyFrame: 0 };
 
@@ -64,7 +72,7 @@ let App: ComponentType<{ rows: Line[] }>;
 Object.assign(window, {
   bench: {
     async load() {
-      App = (await loaders[lib]()).App;
+      App = (await loadApp()).App;
     },
     /** Time from render() until the last commit caused by mounting is painted */
     async mount() {
