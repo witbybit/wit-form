@@ -1,9 +1,10 @@
 'use client';
 
-import { Atom, ChevronDown } from 'lucide-react';
+import { Atom, ChevronDown, Trash2 } from 'lucide-react';
 import {
   createContext,
   memo,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -26,10 +27,10 @@ import {
 import { cn } from '@/lib/cn';
 
 const ROWS = 500;
-// Five fields and a total per row, plus the remote count and the payroll total
-const COMPONENTS = ROWS * 6 + 2;
+// Five fields and a total per row, plus the sheet, the remote count and the payroll total
+const componentsFor = (rows: number) => rows * 6 + 3;
 const COLUMNS =
-  'grid-cols-[2.5rem_minmax(9rem,1fr)_8.5rem_7rem_7rem_4.5rem_7rem]';
+  'grid-cols-[2.5rem_minmax(9rem,1fr)_8.5rem_7rem_7rem_4.5rem_7rem_2rem]';
 
 const teams = ['Engineering', 'Design', 'Sales', 'Support', 'Finance'];
 const firstNames = [
@@ -62,7 +63,7 @@ const lastNames = [
 ];
 
 const initialRows = Array.from({ length: ROWS }, (_, i) => ({
-  name: `${firstNames[i % 12]} ${lastNames[(i * 5 + Math.floor(i / 12)) % 12]}`,
+  name: `${firstNames[i % 12]} ${String.fromCharCode(65 + ((i * 7) % 26))}. ${lastNames[(i * 5 + Math.floor(i / 12)) % 12]}`,
   team: teams[(i * 7) % teams.length],
   salary: 4200 + ((i * 373) % 46) * 100,
   bonus: (i * 7) % 5 === 0 ? 500 : 0,
@@ -105,7 +106,7 @@ const script: { row: number; column: Column; values: Value[] }[] = [
  * and runs the autoplay cursor. Nothing here is part of wit-form.
  */
 function createInspector() {
-  let stats = { rendered: 0, ms: 0, edits: 0 };
+  let stats = { rendered: 0, ms: 0, edits: 0, components: componentsFor(ROWS) };
   let ready = false;
   let commits = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -126,6 +127,10 @@ function createInspector() {
     commit() {
       if (ready) commits += 1;
     },
+    setRows(rows: number) {
+      stats = { ...stats, components: componentsFor(rows) };
+      notify();
+    },
     setWriter(next: typeof writer) {
       writer = next;
       ready = false;
@@ -138,7 +143,7 @@ function createInspector() {
       flushSync(update);
       const ms = performance.now() - start;
       afterNextPaint(() => {
-        stats = { rendered: commits, ms, edits: stats.edits + 1 };
+        stats = { ...stats, rendered: commits, ms, edits: stats.edits + 1 };
         notify();
       });
     },
@@ -146,7 +151,9 @@ function createInspector() {
       let step = 0;
       const run = () => {
         const { row, column, values } = script[step % script.length];
-        const cell = root.querySelector(`[data-cell="${row}-${column}"]`);
+        const cell = root
+          .querySelectorAll('[data-sheet-row]')
+          [row]?.querySelector(`[data-column="${column}"]`);
         cell?.setAttribute('data-typing', '');
         values.forEach((value, i) => {
           timer = setTimeout(
@@ -211,15 +218,16 @@ function useCell<T>(rowId: number, name: Column) {
   return useField<T>({ name, ancestors });
 }
 
-function TextCell(props: { rowId: number; row: number }) {
+function TextCell(props: { rowId: number }) {
   const inspector = useInspector();
   const ref = useHighlight<HTMLInputElement>();
   const { fieldValue, setFieldValue } = useCell<string>(props.rowId, 'name');
   return (
     <input
       ref={ref}
-      data-cell={`${props.row}-name`}
-      aria-label={`Name, row ${props.row + 1}`}
+      id={`sheet-name-${props.rowId}`}
+      data-column="name"
+      aria-labelledby="sheet-col-name"
       value={fieldValue ?? ''}
       onChange={(e) => inspector.edit(() => setFieldValue(e.target.value))}
       className={cn(cellClass, 'px-2')}
@@ -227,7 +235,7 @@ function TextCell(props: { rowId: number; row: number }) {
   );
 }
 
-function SelectCell(props: { rowId: number; row: number }) {
+function SelectCell(props: { rowId: number }) {
   const inspector = useInspector();
   const ref = useHighlight<HTMLSelectElement>();
   const { fieldValue, setFieldValue } = useCell<string>(props.rowId, 'team');
@@ -235,8 +243,8 @@ function SelectCell(props: { rowId: number; row: number }) {
     <div className="relative">
       <select
         ref={ref}
-        data-cell={`${props.row}-team`}
-        aria-label={`Team, row ${props.row + 1}`}
+        data-column="team"
+        aria-labelledby={`sheet-col-team sheet-name-${props.rowId}`}
         value={fieldValue ?? ''}
         onChange={(e) => inspector.edit(() => setFieldValue(e.target.value))}
         className={cn(cellClass, 'appearance-none pr-7 pl-2')}
@@ -253,11 +261,7 @@ function SelectCell(props: { rowId: number; row: number }) {
   );
 }
 
-function MoneyCell(props: {
-  rowId: number;
-  row: number;
-  name: 'salary' | 'bonus';
-}) {
+function MoneyCell(props: { rowId: number; name: 'salary' | 'bonus' }) {
   const inspector = useInspector();
   const ref = useHighlight<HTMLInputElement>();
   const { fieldValue, setFieldValue } = useCell<number>(
@@ -275,9 +279,9 @@ function MoneyCell(props: {
       </span>
       <input
         ref={ref}
-        data-cell={`${props.row}-${props.name}`}
+        data-column={props.name}
         inputMode="numeric"
-        aria-label={`${props.name === 'salary' ? 'Salary' : 'Bonus'}, row ${props.row + 1}`}
+        aria-labelledby={`sheet-col-${props.name} sheet-name-${props.rowId}`}
         value={fieldValue ? String(fieldValue) : ''}
         placeholder="0"
         onChange={(e) => {
@@ -293,7 +297,7 @@ function MoneyCell(props: {
   );
 }
 
-function CheckboxCell(props: { rowId: number; row: number }) {
+function CheckboxCell(props: { rowId: number }) {
   const inspector = useInspector();
   const ref = useHighlight<HTMLInputElement>();
   const { fieldValue, setFieldValue } = useCell<boolean>(props.rowId, 'remote');
@@ -302,8 +306,8 @@ function CheckboxCell(props: { rowId: number; row: number }) {
       <input
         ref={ref}
         type="checkbox"
-        data-cell={`${props.row}-remote`}
-        aria-label={`Remote, row ${props.row + 1}`}
+        data-column="remote"
+        aria-labelledby={`sheet-col-remote sheet-name-${props.rowId}`}
         checked={!!fieldValue}
         onChange={(e) => inspector.edit(() => setFieldValue(e.target.checked))}
         className="size-4 rounded accent-emerald-600 outline outline-offset-4 outline-transparent data-[typing]:ring-2 data-[typing]:ring-sky-400/40"
@@ -334,23 +338,39 @@ function RowTotal(props: { rowId: number }) {
   );
 }
 
-const Row = memo(function Row(props: { rowId: number; row: number }) {
+// Rows know only their rowId, so deleting one doesn't re-render the rows after it.
+// The row number comes from a CSS counter, so it never needs a render either.
+const Row = memo(function Row(props: {
+  rowId: number;
+  onRemove: (rowId: number) => void;
+}) {
   return (
     <div
+      data-sheet-row
       className={cn(
-        'grid items-center gap-2 border-b px-3 py-1.5 last:border-b-0',
+        'grid items-center gap-2 border-b px-3 py-1.5 [counter-increment:row] last:border-b-0',
         COLUMNS
       )}
     >
-      <span className="font-mono text-xs text-fd-muted-foreground tabular-nums">
-        {props.row + 1}
-      </span>
-      <TextCell rowId={props.rowId} row={props.row} />
-      <SelectCell rowId={props.rowId} row={props.row} />
-      <MoneyCell rowId={props.rowId} row={props.row} name="salary" />
-      <MoneyCell rowId={props.rowId} row={props.row} name="bonus" />
-      <CheckboxCell rowId={props.rowId} row={props.row} />
+      {/* Numbered by CSS, for the eye only; screen readers identify rows by name */}
+      <span
+        aria-hidden
+        className="font-mono text-xs text-fd-muted-foreground tabular-nums before:content-[counter(row)]"
+      />
+      <TextCell rowId={props.rowId} />
+      <SelectCell rowId={props.rowId} />
+      <MoneyCell rowId={props.rowId} name="salary" />
+      <MoneyCell rowId={props.rowId} name="bonus" />
+      <CheckboxCell rowId={props.rowId} />
       <RowTotal rowId={props.rowId} />
+      <button
+        type="button"
+        aria-labelledby={`sheet-delete sheet-name-${props.rowId}`}
+        onClick={() => props.onRemove(props.rowId)}
+        className="grid size-7 place-items-center rounded-md text-fd-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-rose-500/40 dark:hover:text-rose-300"
+      >
+        <Trash2 className="size-3.5" />
+      </button>
     </div>
   );
 });
@@ -398,14 +418,30 @@ function PayrollTotal() {
 
 function Sheet() {
   const inspector = useInspector();
+  // The sheet renders only when rows are added or removed; count those renders too
+  useLayoutEffect(() => {
+    if (inspector.ready) inspector.commit();
+  });
   const initialValues = useMemo(() => ({ people: initialRows }), []);
   useForm({ initialValues, onSubmit: () => {} });
-  const { fieldArrayProps } = useFieldArray({
+  const { fieldArrayProps, remove } = useFieldArray({
     name: 'people',
     fieldNames: ['name', 'team', 'salary', 'bonus', 'remote'],
   });
   const { setValue } = useFormContext();
   const rowIds = fieldArrayProps.rowIds;
+
+  // One function for every row, so rows can stay memoized
+  const latest = useRef({ rowIds, remove });
+  latest.current = { rowIds, remove };
+  const removeRow = useCallback(
+    (rowId: number) =>
+      inspector.edit(() =>
+        latest.current.remove(latest.current.rowIds.indexOf(rowId))
+      ),
+    [inspector]
+  );
+  useEffect(() => inspector.setRows(rowIds.length), [inspector, rowIds.length]);
 
   useEffect(() => {
     inspector.setWriter((row, column, value) =>
@@ -429,7 +465,7 @@ function Sheet() {
             Team budget · Q4
           </div>
           <div className="text-lg font-semibold tracking-tight">
-            {ROWS} people
+            {rowIds.length} people
           </div>
         </div>
         <div className="flex gap-6">
@@ -439,7 +475,7 @@ function Sheet() {
       </div>
       {/* One scroll box both ways, so the header stays put and phones can swipe sideways */}
       <div className="h-[20rem] overflow-auto">
-        <div className="min-w-[46rem]">
+        <div className="min-w-[48rem] [counter-reset:row]">
           <div
             className={cn(
               'sticky top-0 z-10 grid gap-2 border-b bg-fd-muted px-3 py-2 text-xs font-medium text-fd-muted-foreground',
@@ -447,15 +483,24 @@ function Sheet() {
             )}
           >
             <span>#</span>
-            <span>Name</span>
-            <span>Team</span>
-            <span className="text-right">Salary</span>
-            <span className="text-right">Bonus</span>
-            <span className="text-center">Remote</span>
+            <span id="sheet-col-name">Name</span>
+            <span id="sheet-col-team">Team</span>
+            <span id="sheet-col-salary" className="text-right">
+              Salary
+            </span>
+            <span id="sheet-col-bonus" className="text-right">
+              Bonus
+            </span>
+            <span id="sheet-col-remote" className="text-center">
+              Remote
+            </span>
             <span className="text-right">Total</span>
+            <span id="sheet-delete" className="sr-only">
+              Delete
+            </span>
           </div>
-          {rowIds.map((rowId, row) => (
-            <Row key={rowId} rowId={rowId} row={row} />
+          {rowIds.map((rowId) => (
+            <Row key={rowId} rowId={rowId} onRemove={removeRow} />
           ))}
         </div>
       </div>
@@ -478,12 +523,12 @@ function InspectorBar() {
       </span>
       <span aria-live="polite">
         {stats.edits === 0 ? (
-          `${COMPONENTS.toLocaleString('en-US')} components · edit any cell`
+          `${stats.components.toLocaleString('en-US')} components · edit any cell`
         ) : (
           <>
             Last edit:{' '}
             <span className="font-semibold text-sky-300">{stats.rendered}</span>{' '}
-            of {COMPONENTS.toLocaleString('en-US')} components rendered ·{' '}
+            of {stats.components.toLocaleString('en-US')} components rendered ·{' '}
             {stats.ms < 10 ? stats.ms.toFixed(1) : Math.round(stats.ms)} ms
           </>
         )}
