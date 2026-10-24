@@ -1,12 +1,41 @@
+import { highlight } from 'fumadocs-core/highlight';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { libVersion } from '@/lib/shared';
 import { CopyPromptButton } from './copy-prompt-button';
 import { InstallCommand } from './install-command';
 import { ButtonLink, Container } from './primitives';
-import { PayrollDemo } from './payroll-demo';
+import { heroDemoCode, type HeroDemoKey } from './hero-demo-code';
+import { HeroDemos } from './hero-demos';
 
-export function Hero() {
+/** Highlights each demo's code on the server, so "View code" costs the browser nothing */
+async function highlightDemoCode() {
+  const entries = await Promise.all(
+    (Object.keys(heroDemoCode) as HeroDemoKey[]).map(async (key) => {
+      const { file, code } = heroDemoCode[key];
+      const html = await highlight(code, {
+        lang: 'tsx',
+        theme: 'github-dark-default',
+        components: {
+          pre: (props) => (
+            <pre className="overflow-x-auto p-5 font-mono text-[13px] leading-6">
+              {props.children}
+            </pre>
+          ),
+        },
+      });
+      return [key, { file, code: html }] as const;
+    })
+  );
+  return Object.fromEntries(entries) as Record<
+    HeroDemoKey,
+    { file: string; code: ReactNode }
+  >;
+}
+
+export async function Hero() {
+  const code = await highlightDemoCode();
   return (
     <section className="relative isolate overflow-x-clip">
       <BackgroundGrid />
@@ -50,7 +79,7 @@ export function Hero() {
           <InstallCommand compact />
         </div>
 
-        <PayrollDemo />
+        <HeroDemos code={code} />
       </Container>
     </section>
   );
