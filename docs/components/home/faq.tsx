@@ -24,6 +24,21 @@ function DocLink(props: { href: string; children: ReactNode }) {
 
 const questions: { q: string; a: ReactNode }[] = [
   {
+    q: 'How is it different from React Hook Form or TanStack Form?',
+    a: (
+      <>
+        All three keep typing cheap. React Hook Form shines with native,
+        uncontrolled inputs; TanStack Form has the deepest type inference and
+        runs outside React too. Wit Form is built for big, dynamic forms: every
+        input is controlled through the same <Code>useField</Code>, table rows
+        keep stable ids, totals can watch a single column, and one schema maps
+        its errors onto every field. It&apos;s also new, with no devtools or
+        server-action helpers yet. See the{' '}
+        <DocLink href="/docs/comparison">full comparison</DocLink>.
+      </>
+    ),
+  },
+  {
     q: 'Do I need to know Jotai?',
     a: (
       <>
@@ -80,24 +95,14 @@ const questions: { q: string; a: ReactNode }[] = [
       </>
     ),
   },
-  {
-    q: 'I use react-recoil-form. How do I switch?',
-    a: (
-      <>
-        Wit Form is its successor, with the same API on Jotai in place of
-        Recoil. Swap the packages, change the imports, and remove any{' '}
-        <Code>RecoilRoot</Code> you added only for forms. See the{' '}
-        <DocLink href="/docs/guides/migrating">migration guide</DocLink>.
-      </>
-    ),
-  },
 ];
 
 export function Faq() {
   return (
-    <section className="py-20 sm:py-28">
+    <section className="border-t py-20 sm:py-28">
       <Container className="grid gap-10 lg:grid-cols-[1fr_2fr] lg:gap-16">
         <SectionHeading
+          index="04"
           eyebrow="FAQ"
           title="Questions, answered."
           description={
@@ -112,7 +117,7 @@ export function Faq() {
         />
         <div className="divide-y border-y">
           {questions.map((item) => (
-            <details key={item.q} className="group">
+            <details key={item.q} className="faq-item group">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-6 rounded-md py-5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 [&::-webkit-details-marker]:hidden">
                 {item.q}
                 <Plus

@@ -13,8 +13,24 @@ export function Container(props: { children: ReactNode; className?: string }) {
   );
 }
 
+/** Numbered section label, e.g. "02 · The API", so the page reads as one sequence */
+export function Eyebrow(props: { index?: string; children: ReactNode }) {
+  return (
+    <p className="flex items-center gap-2 font-mono text-xs font-medium uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">
+      {props.index && (
+        <>
+          <span className="text-fd-muted-foreground">{props.index}</span>
+          <span aria-hidden className="h-px w-6 bg-current opacity-40" />
+        </>
+      )}
+      {props.children}
+    </p>
+  );
+}
+
 export function SectionHeading(props: {
   eyebrow: string;
+  index?: string;
   title: ReactNode;
   description?: ReactNode;
   align?: 'left' | 'center';
@@ -27,9 +43,7 @@ export function SectionHeading(props: {
         centered && 'mx-auto items-center text-center'
       )}
     >
-      <p className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">
-        {props.eyebrow}
-      </p>
+      <Eyebrow index={props.index}>{props.eyebrow}</Eyebrow>
       <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
         {props.title}
       </h2>

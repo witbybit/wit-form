@@ -13,7 +13,11 @@ const managers = {
 
 type Manager = keyof typeof managers;
 
-export function InstallCommand(props: { className?: string }) {
+/** compact drops the package manager tabs, for a one-line command in the hero */
+export function InstallCommand(props: {
+  className?: string;
+  compact?: boolean;
+}) {
   const [manager, setManager] = useState<Manager>('pnpm');
   const [copied, setCopied] = useState(false);
 
@@ -36,33 +40,41 @@ export function InstallCommand(props: { className?: string }) {
     <div
       className={cn(
         'w-full max-w-md overflow-hidden rounded-xl border bg-fd-card/80 backdrop-blur',
+        props.compact && 'w-auto max-w-full rounded-full',
         props.className
       )}
     >
+      {!props.compact && (
+        <div
+          role="tablist"
+          aria-label="Package manager"
+          className="flex border-b px-1.5"
+        >
+          {(Object.keys(managers) as Manager[]).map((name) => (
+            <button
+              key={name}
+              role="tab"
+              type="button"
+              aria-selected={manager === name}
+              onClick={() => setManager(name)}
+              className={cn(
+                'relative px-3 py-2 font-mono text-xs transition-colors outline-none focus-visible:text-fd-foreground',
+                manager === name
+                  ? 'text-fd-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-px after:bg-emerald-500'
+                  : 'text-fd-muted-foreground hover:text-fd-foreground'
+              )}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
       <div
-        role="tablist"
-        aria-label="Package manager"
-        className="flex border-b px-1.5"
+        className={cn(
+          'flex items-center gap-3 py-2.5 pr-2 pl-4',
+          props.compact && 'py-1 pl-5'
+        )}
       >
-        {(Object.keys(managers) as Manager[]).map((name) => (
-          <button
-            key={name}
-            role="tab"
-            type="button"
-            aria-selected={manager === name}
-            onClick={() => setManager(name)}
-            className={cn(
-              'relative px-3 py-2 font-mono text-xs transition-colors outline-none focus-visible:text-fd-foreground',
-              manager === name
-                ? 'text-fd-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-px after:bg-emerald-500'
-                : 'text-fd-muted-foreground hover:text-fd-foreground'
-            )}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-3 py-2.5 pr-2 pl-4">
         <code className="flex-1 truncate font-mono text-sm">
           <span className="select-none text-emerald-700 dark:text-emerald-400">
             ${' '}

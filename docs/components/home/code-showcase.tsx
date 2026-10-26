@@ -1,37 +1,22 @@
 import { highlight } from 'fumadocs-core/highlight';
-import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
 import { CodeTabs } from './code-tabs';
 import { Container, SectionHeading } from './primitives';
 
 const samples = [
   {
     id: 'fields',
-    label: 'Fields',
-    file: 'text-field.tsx',
-    title: 'Bring your own inputs',
-    body: 'useField hands you a value, a setter and an error. Wire them to any input, from a native element to your design system.',
+    file: 'profile-form.tsx',
+    title: 'A form in a few lines',
+    body: 'A provider, useForm to submit, and your own inputs. Write each input once with useField, styled your way, then reuse it in every form.',
     href: '/docs/getting-started',
     code: `import { FormProvider, useField, useForm } from 'wit-form';
 
-function TextField({ name, label }: { name: string; label: string }) {
-  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
-    name,
-    validate: (value) => (!value ? 'Required' : null),
-  });
-
-  return (
-    <label>
-      {label}
-      <input
-        value={fieldValue ?? ''}
-        onChange={(e) => setFieldValue(e.target.value)}
-        onBlur={onBlur}
-      />
-      {error && <span role="alert">{error}</span>}
-    </label>
-  );
-}
+// A whole form: a provider, a submit handler and the fields
+export const ProfileForm = () => (
+  <FormProvider>
+    <Profile />
+  </FormProvider>
+);
 
 function Profile() {
   const { handleSubmit } = useForm({ onSubmit: save });
@@ -44,14 +29,30 @@ function Profile() {
   );
 }
 
-export const ProfileForm = () => <FormProvider><Profile /></FormProvider>;`,
+// Write each input once, styled your way, and reuse it everywhere
+function TextField({ name, label }: { name: string; label: string }) {
+  const { fieldValue, setFieldValue, onBlur, error } = useField<string>({
+    name,
+    validate: (value) => (!value ? 'Required' : null),
+  });
+  return (
+    <label>
+      {label}
+      <input
+        value={fieldValue ?? ''}
+        onChange={(e) => setFieldValue(e.target.value)}
+        onBlur={onBlur}
+      />
+      {error && <span role="alert">{error}</span>}
+    </label>
+  );
+}`,
   },
   {
     id: 'arrays',
-    label: 'Field arrays',
     file: 'order-form.tsx',
-    title: 'Lists, tables and lists inside lists',
-    body: 'Every row gets a stable rowId. Append, insert and remove rows, and only the cells that change re-render.',
+    title: 'Tables and lists inside lists',
+    body: 'Every row gets a stable id. Append, insert, move and remove rows, and only the cells that change re-render.',
     href: '/docs/guides/field-arrays',
     code: `const { fieldArrayProps, append, insert, remove, error } = useFieldArray({
   name: 'items',
@@ -76,10 +77,9 @@ return (
   },
   {
     id: 'validation',
-    label: 'Validation',
     file: 'password-form.tsx',
-    title: 'Rules at every level',
-    body: 'Validate a field, a whole list or the full form. depFields re-run a rule when the fields it depends on change.',
+    title: 'Validation at every level',
+    body: 'Rules for a field, a list or the whole form, as plain functions or any Standard Schema. depFields re-runs a rule when a field it depends on changes.',
     href: '/docs/guides/validation',
     code: `// Re-validates whenever "password" changes
 useField({
@@ -100,10 +100,9 @@ useForm({
   },
   {
     id: 'watch',
-    label: 'Watching values',
     file: 'order-total.tsx',
-    title: 'Live values, scoped re-renders',
-    body: 'Subscribe to one field, one column of a table or the whole form. Only the component that watches re-renders.',
+    title: 'Watch values without the cost',
+    body: 'Subscribe to one field, one table column or the whole form. Only the component that watches re-renders, so a live total never slows the inputs.',
     href: '/docs/guides/watching-values',
     code: `// Re-renders only when qty or price change in any row
 function OrderTotal() {
@@ -141,34 +140,22 @@ export async function CodeShowcase() {
   );
 
   return (
-    <section className="border-y bg-fd-card/30 py-20 sm:py-28">
+    <section className="py-20 sm:py-24">
       <Container className="flex flex-col gap-12">
         <SectionHeading
+          index="02"
           eyebrow="The API"
-          title="A handful of hooks. Plain functions or your schema, no magic."
-          description="Wit Form manages state and validation. You keep full control of markup, styling and accessibility."
+          title="A few hooks. Your inputs, your markup."
+          description="Wit Form owns state and validation. You own the markup, styling and accessibility, so it fits any design system."
         />
         <CodeTabs
-          tabs={samples.map((tab, i) => ({
-            id: tab.id,
-            label: tab.label,
-            file: tab.file,
+          tabs={samples.map((sample, i) => ({
+            id: sample.id,
+            title: sample.title,
+            body: sample.body,
+            href: sample.href,
+            file: sample.file,
             code: highlighted[i],
-            aside: (
-              <div className="flex flex-col gap-3">
-                <h3 className="text-xl font-semibold tracking-tight">
-                  {tab.title}
-                </h3>
-                <p className="text-fd-muted-foreground">{tab.body}</p>
-                <Link
-                  href={tab.href}
-                  className="group mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 dark:hover:text-emerald-200"
-                >
-                  Read the guide
-                  <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
-                </Link>
-              </div>
-            ),
           }))}
         />
       </Container>

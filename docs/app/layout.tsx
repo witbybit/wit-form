@@ -5,7 +5,8 @@ import './global.css';
 
 export const metadata: Metadata = {
   title: { template: '%s | Wit Form', default: 'Wit Form' },
-  description: 'Fast React forms where every field is a Jotai atom.',
+  description:
+    'Headless React forms that stay fast at thousands of fields. Every field is its own Jotai atom, so typing re-renders only that field.',
   // Set DOCS_SITE_URL to the deployed URL so social preview images resolve
   ...(process.env.DOCS_SITE_URL && {
     metadataBase: new URL(process.env.DOCS_SITE_URL),

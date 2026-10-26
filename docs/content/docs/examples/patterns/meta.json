@@ -1,6 +1,7 @@
 {
   "title": "Patterns",
   "pages": [
+    "custom-inputs",
     "multi-step-wizard",
     "edit-a-record",
     "imperative-updates",

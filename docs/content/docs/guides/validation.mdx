@@ -16,6 +16,15 @@ A validator can also be `async` and return a promise of the message, for checks 
 
 If you already describe your data with a schema library, pass the schema instead. See [Schema validation](#schema-validation).
 
+| You want to…                                   | Use                                                       |
+| ---------------------------------------------- | --------------------------------------------------------- |
+| Check one field                                | [`validate` on the field](#field-validation)              |
+| Reuse a Zod, Valibot or ArkType schema         | [`schema` on the form](#schema-validation)                |
+| Show errors the server sent back               | [`setError` and `setFormErrors`](#errors-from-the-server) |
+| Compare fields, like two passwords             | [`depFields`](#rules-that-depend-on-other-fields)         |
+| Ask the server, like "is this username taken?" | [An `async` validator](#async-validation)                 |
+| Check a whole list, like "at least one item"   | [Field array validation](#field-array-validation)         |
+
 ## Field validation
 
 Pass `validate` to `useField`:
@@ -68,100 +77,6 @@ function NameField() {
 ```
 
 Try it in the [Field Rules example](/docs/examples/validation/field-rules).
-
-## Rules that depend on other fields
-
-To compare a field with another one, like "confirm password" with "password", list the other fields in `depFields`. Their current values arrive in the validator's second argument as `other.values`:
-
-```tsx
-const validateConfirmation = (
-  value?: string,
-  other?: { values: { password?: string } }
-) => (value !== other?.values.password ? 'Passwords do not match' : null);
-
-useField({
-  name: 'confirmPassword',
-  depFields: ['password'],
-  validate: validateConfirmation,
-});
-```
-
-When `password` changes, `confirmPassword` re-validates automatically, even though the user didn't touch it.
-
-`depFields` takes field names, or `{ name, ancestors }` objects for fields inside a field array row.
-
-During a submit, `other.values` contains **every** form value, not only the `depFields`.
-
-See the [Cross-field Rules example](/docs/examples/validation/cross-field-rules).
-
-## Rules that depend on props or state
-
-Sometimes a rule depends on something outside the form, like the user's account balance passed in as a prop. Since `validate` is read only once, use `validateCallback` with `useCallback`:
-
-```tsx
-function AmountField({ balance }: { balance: number }) {
-  const validateCallback = useCallback(
-    (value?: number) =>
-      value !== undefined && value > balance ? 'Not enough funds' : null,
-    [balance]
-  );
-  const field = useField<number>({ name: 'amount', validateCallback });
-  // ...
-}
-```
-
-Wit Form always uses the latest `validateCallback`. The new rule takes effect the next time the field validates: when its value changes, or on submit.
-
-Keep the callback's dependencies stable. A new function on every render causes extra work.
-
-See the [Dynamic Rules example](/docs/examples/validation/dynamic-rules).
-
-## Async validation
-
-Some checks need the server, like "is this username taken?". Make the validator `async`, or return a promise:
-
-```tsx
-const validateUsername = async (value?: string) => {
-  if (!value || value.length < 3) return null; // cheap checks first
-  const available = await api.isUsernameAvailable(value);
-  return available ? null : 'This username is taken';
-};
-
-function UsernameField() {
-  const { fieldValue, setFieldValue, onBlur, error, isValidating } =
-    useField<string>({
-      name: 'username',
-      validate: validateUsername,
-      // Wait until typing pauses for 400 ms before validating
-      debounceValidation: 400,
-    });
-  // ...render the input, `error`, and a spinner while `isValidating`
-}
-```
-
-- **`isValidating`** is `true` while the validator runs, and while a debounced validation is waiting.
-- **`debounceValidation`** (milliseconds) waits for typing to pause, so the server isn't asked about every keystroke.
-- **Outdated results are ignored.** If the user keeps typing and an older check finishes after a newer one, the older result is dropped.
-- **A failing check blocks submission.** If the promise rejects or the validator throws, the error's message (or "Validation failed") becomes the field's error, so a network failure can't let invalid data through.
-- **Validators also run when the field mounts**, so `formState.isValid` is accurate from the start. Return early for empty values to avoid a request on mount, as above.
-
-Field array validators and the form-level `validate` can be async too.
-
-### Submitting with async validators
-
-`handleSubmit` waits for pending async validators before deciding. While it waits, `formState.isValidating` is `true`. Use it to disable the submit button:
-
-```tsx
-const { handleSubmit, formState } = useForm({ onSubmit });
-
-<button disabled={formState.isSubmitting || formState.isValidating}>
-  Save
-</button>;
-```
-
-When no validator is async, submitting stays fully synchronous, as before.
-
-See the [Async Rules example](/docs/examples/validation/async-rules).
 
 ## Schema validation
 
@@ -217,6 +132,103 @@ useFieldArray({
   schema: z.array(z.object({ email: z.string() })).min(1, 'Add a person'),
 });
 ```
+
+## Errors from the server
+
+Some errors are only known after the server answers, like "this email is already registered". Show them with `setError`, from `useForm` or `useFormContext`:
+
+```tsx
+const { handleSubmit, setError, setFormErrors } = useForm({
+  onSubmit: async (values) => {
+    const result = await api.signUp(values);
+    if (result.emailTaken) {
+      setError('email', 'This email is already registered');
+      return false; // keep the user's edits
+    }
+    if (!result.ok) {
+      setFormErrors(['Something went wrong. Try again.']);
+      return false;
+    }
+  },
+});
+```
+
+- `setError(name, message)` shows the message on that field right away, whatever the mode. For a field in a row, pass `{ name, type: 'field', ancestors }`. For a field array, pass `{ name, type: 'field-array' }`.
+- The error stays until the field validates again, which happens when its value changes.
+- `setFormErrors(messages)` sets `formState.formErrors`.
+- `clearErrors()` clears every error and form error. `clearErrors(['email'])` clears only those fields.
+
+## Rules that depend on other fields
+
+To compare a field with another one, like "confirm password" with "password", list the other fields in `depFields`. Their current values arrive in the validator's second argument as `other.values`:
+
+```tsx
+const validateConfirmation = (
+  value?: string,
+  other?: { values: { password?: string } }
+) => (value !== other?.values.password ? 'Passwords do not match' : null);
+
+useField({
+  name: 'confirmPassword',
+  depFields: ['password'],
+  validate: validateConfirmation,
+});
+```
+
+When `password` changes, `confirmPassword` re-validates automatically, even though the user didn't touch it.
+
+`depFields` takes field names, or `{ name, ancestors }` objects for fields inside a field array row.
+
+During a submit, `other.values` contains **every** form value, not only the `depFields`.
+
+See the [Cross-field Rules example](/docs/examples/validation/cross-field-rules).
+
+## Async validation
+
+Some checks need the server, like "is this username taken?". Make the validator `async`, or return a promise:
+
+```tsx
+const validateUsername = async (value?: string) => {
+  if (!value || value.length < 3) return null; // cheap checks first
+  const available = await api.isUsernameAvailable(value);
+  return available ? null : 'This username is taken';
+};
+
+function UsernameField() {
+  const { fieldValue, setFieldValue, onBlur, error, isValidating } =
+    useField<string>({
+      name: 'username',
+      validate: validateUsername,
+      // Wait until typing pauses for 400 ms before validating
+      debounceValidation: 400,
+    });
+  // ...render the input, `error`, and a spinner while `isValidating`
+}
+```
+
+- **`isValidating`** is `true` while the validator runs, and while a debounced validation is waiting.
+- **`debounceValidation`** (milliseconds) waits for typing to pause, so the server isn't asked about every keystroke.
+- **Outdated results are ignored.** If the user keeps typing and an older check finishes after a newer one, the older result is dropped.
+- **A failing check blocks submission.** If the promise rejects or the validator throws, the error's message (or "Validation failed") becomes the field's error, so a network failure can't let invalid data through.
+- **Validators also run when the field mounts**, so `formState.isValid` is accurate from the start. Return early for empty values to avoid a request on mount, as above.
+
+Field array validators and the form-level `validate` can be async too.
+
+### Submitting with async validators
+
+`handleSubmit` waits for pending async validators before deciding. While it waits, `formState.isValidating` is `true`. Use it to disable the submit button:
+
+```tsx
+const { handleSubmit, formState } = useForm({ onSubmit });
+
+<button disabled={formState.isSubmitting || formState.isValidating}>
+  Save
+</button>;
+```
+
+When no validator is async, submitting stays fully synchronous, as before.
+
+See the [Async Rules example](/docs/examples/validation/async-rules).
 
 ## Field array validation
 
@@ -276,31 +288,6 @@ To change the form-level rule from a child component, use [useSetFormProps](/doc
 
 See the [Form-level Rules example](/docs/examples/validation/form-level-rules).
 
-## Errors from the server
-
-Some errors are only known after the server answers, like "this email is already registered". Show them with `setError`, from `useForm` or `useFormContext`:
-
-```tsx
-const { handleSubmit, setError, setFormErrors } = useForm({
-  onSubmit: async (values) => {
-    const result = await api.signUp(values);
-    if (result.emailTaken) {
-      setError('email', 'This email is already registered');
-      return false; // keep the user's edits
-    }
-    if (!result.ok) {
-      setFormErrors(['Something went wrong. Try again.']);
-      return false;
-    }
-  },
-});
-```
-
-- `setError(name, message)` shows the message on that field right away, whatever the mode. For a field in a row, pass `{ name, type: 'field', ancestors }`. For a field array, pass `{ name, type: 'field-array' }`.
-- The error stays until the field validates again, which happens when its value changes.
-- `setFormErrors(messages)` sets `formState.formErrors`.
-- `clearErrors()` clears every error and form error. `clearErrors(['email'])` clears only those fields.
-
 ## What happens on submit
 
 `handleSubmit` runs, in this order:
@@ -342,6 +329,45 @@ const { fieldValue, setFieldValue, error, ref } = useField({ name: 'email' });
 
 Turn it off with `useForm({ shouldFocusError: false })`. To focus a field yourself, call `setFocus(name)` from `useForm` or `useFormContext`.
 
+## Knowing whether the form is valid
+
+`formState`, from `useForm` or [`useFormState`](/docs/api/use-form-state), has the form's validation state:
+
+```tsx
+const { formState } = useForm({ onSubmit });
+
+<button disabled={!formState.isValid}>Save</button>;
+```
+
+- `isValid`: no field or field array has an error, and the form schema passes. The form-level `validate` only runs on submit, so it isn't included.
+- `isValidating`: an async validator is running.
+- `errors`: every current field error, including ones not shown yet. Useful for an error summary.
+- `formErrors`: the form-level errors from the last submit.
+
+A component only re-renders when a property it reads changes, so reading `isValid` doesn't re-render on every keystroke.
+
+## Rules that depend on props or state
+
+Sometimes a rule depends on something outside the form, like the user's account balance passed in as a prop. Since `validate` is read only once, use `validateCallback` with `useCallback`:
+
+```tsx
+function AmountField({ balance }: { balance: number }) {
+  const validateCallback = useCallback(
+    (value?: number) =>
+      value !== undefined && value > balance ? 'Not enough funds' : null,
+    [balance]
+  );
+  const field = useField<number>({ name: 'amount', validateCallback });
+  // ...
+}
+```
+
+Wit Form always uses the latest `validateCallback`. The new rule takes effect the next time the field validates: when its value changes, or on submit.
+
+Keep the callback's dependencies stable. A new function on every render causes extra work.
+
+See the [Dynamic Rules example](/docs/examples/validation/dynamic-rules).
+
 ## Validating without submitting
 
 `useForm` gives you functions for validating on demand. `validateAllFields` and `validateAllFieldsAsync` are also available from `useFormContext`:
@@ -369,23 +395,6 @@ All of them return the same error objects as `onError` and mark failing fields a
 `validateFields` accepts top-level names as strings. For a field inside a row, pass `{ name, type: 'field', ancestors }`. A string that matches a top-level field array validates that array.
 
 The [Multi-step Wizard example](/docs/examples/patterns/multi-step-wizard) uses `validateFields` to check each step.
-
-## Knowing whether the form is valid
-
-`formState`, from `useForm` or [`useFormState`](/docs/api/use-form-state), has the form's validation state:
-
-```tsx
-const { formState } = useForm({ onSubmit });
-
-<button disabled={!formState.isValid}>Save</button>;
-```
-
-- `isValid`: no field or field array has an error, and the form schema passes. The form-level `validate` only runs on submit, so it isn't included.
-- `isValidating`: an async validator is running.
-- `errors`: every current field error, including ones not shown yet. Useful for an error summary.
-- `formErrors`: the form-level errors from the last submit.
-
-A component only re-renders when a property it reads changes, so reading `isValid` doesn't re-render on every keystroke.
 
 ## The `<Field>` shortcut
 

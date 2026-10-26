@@ -17,6 +17,8 @@ yarn add wit-form jotai
 
 You need React 18 or newer and Jotai 3 or newer. The package is ESM-only and ships its own TypeScript types.
 
+**Next.js App Router:** the hooks only run in Client Components, so put `'use client'` at the top of the file that holds your form.
+
 ## The three pieces of every form
 
 Every form is made of the same three pieces:
@@ -129,6 +131,23 @@ export default withFormProvider(SignupForm);
 ```
 
 That's a complete form. You can see it running in the [Quick Start example](/docs/examples/getting-started/quick-start).
+
+## Prefer a schema?
+
+If you already describe your data with Zod, Valibot or ArkType, pass the schema to `useForm` and leave out the `validate` functions. Each error lands on the field at its path:
+
+```tsx
+import { z } from 'zod';
+
+const signupSchema = z.object({
+  name: z.string().min(1, 'Required'),
+  email: z.email('Enter a valid email'),
+});
+
+const { handleSubmit } = useForm({ schema: signupSchema, onSubmit });
+```
+
+See [Schema validation](/docs/guides/validation#schema-validation).
 
 ## Where to go next
 

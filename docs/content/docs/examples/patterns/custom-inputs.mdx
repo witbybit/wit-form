@@ -1,0 +1,42 @@
+---
+title: 'Custom Inputs & UI Kits'
+description: 'Connect components from shadcn/ui, Radix, MUI or your own design system. Submit the empty form to see the first invalid control get focus.'
+---
+
+import CustomInputs from '@/examples/patterns/CustomInputs';
+
+<Tabs items={['Preview', 'Code']}>
+  <Tab value="Preview">
+    <Preview>
+      <CustomInputs />
+    </Preview>
+  </Tab>
+  <Tab value="Code">
+    <include cwd lang="tsx" meta='title="examples/patterns/CustomInputs.tsx"'>
+      examples/patterns/CustomInputs.tsx
+    </include>
+  </Tab>
+</Tabs>
+
+## What this shows
+
+`Switch`, `SegmentedControl` and `TagInput` stand in for components from a UI kit. They know nothing about forms. A short adapter connects each one to a field, and you write it once per component:
+
+- **Value in, value out.** Pass `fieldValue` as the component's value and `setFieldValue` as its change callback. Values can be any type: a boolean, a string, an array of tags.
+- **`ref`** goes on the focusable element, so a failed submit focuses the first invalid control.
+- **`onBlur`** marks the field as touched, which is when its error starts to show.
+
+Every field is controlled, so the same `useField` works for all of them. There's no separate API for custom inputs.
+
+## Adapting a real kit
+
+The only difference between kits is how they report a change:
+
+| Component                 | Wire it as                                                    |
+| ------------------------- | ------------------------------------------------------------- |
+| shadcn/ui, Radix          | `onValueChange={setFieldValue}`                               |
+| MUI `TextField`, `Select` | `onChange={(e) => setFieldValue(e.target.value)}`             |
+| MUI `Autocomplete`        | `onChange={(_, option) => setFieldValue(option?.id, option)}` |
+| react-select              | `onChange={(option) => setFieldValue(option?.value, option)}` |
+
+When the component works with option objects, store the id as the value and the option as its [`extraInfo`](/docs/examples/patterns/extra-info-and-files), so `onSubmit` gets clean ids and the UI keeps the label.
