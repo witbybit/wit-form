@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // Static-assets-only Worker serving the Next.js export in out/
-  "name": "wit-form-docs",
+  "name": "wit-form",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./out",
